@@ -419,7 +419,7 @@ public class ProcedureService {
     }
 
     private void sendStatusNotification(Procedure procedure, String title, String body) {
-        String email = findCorreoEmailFromProcedure(procedure);
+        String email = findEMAILEmailFromProcedure(procedure);
         if (email == null || email.isBlank()) return;
         userRepository.findByEmail(email).ifPresent(user -> {
             if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
@@ -428,7 +428,7 @@ public class ProcedureService {
         });
     }
 
-    private String findCorreoEmailFromProcedure(Procedure procedure) {
+    private String findEMAILEmailFromProcedure(Procedure procedure) {
         List<WorkflowStage> stages = stageRepo.findByWorkflowIdOrderByOrderAsc(procedure.getWorkflowId());
         WorkflowStage startStage = stages.stream()
                 .filter(s -> "start".equalsIgnoreCase(s.getNodeType()))
@@ -445,13 +445,13 @@ public class ProcedureService {
         FormDefinition form = formRepo.findByStageId(fromStart.getToStageId()).orElse(null);
         if (form == null || form.getFields() == null) return null;
 
-        FormDefinition.FormField correoField = form.getFields().stream()
-                .filter(f -> FormDefinition.FieldType.CORREO.equals(f.getType()))
+        FormDefinition.FormField EMAILField = form.getFields().stream()
+                .filter(f -> FormDefinition.FieldType.EMAIL.equals(f.getType()))
                 .findFirst().orElse(null);
-        if (correoField == null) return null;
+        if (EMAILField == null) return null;
 
         if (procedure.getFormData() == null) return null;
-        Object emailValue = procedure.getFormData().get(correoField.getName());
+        Object emailValue = procedure.getFormData().get(EMAILField.getName());
         return emailValue != null ? emailValue.toString() : null;
     }
 

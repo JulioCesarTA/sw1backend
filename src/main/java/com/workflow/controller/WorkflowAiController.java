@@ -14,18 +14,19 @@ public class WorkflowAiController {
 
     private final WorkflowAiProxyService workflowAiProxyService;
 
-    @PostMapping("/diagram-command")
+    @PostMapping("/diagramaporcomand")
     public ResponseEntity<Map<String, Object>> diagramCommand(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(workflowAiProxyService.diagramCommand(body));
     }
 
-    @PostMapping("/bottleneck-analysis")
+    @PostMapping("/detectcuellodebotella")
     public ResponseEntity<Map<String, Object>> bottleneckAnalysis(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(workflowAiProxyService.bottleneckAnalysis(body));
     }
 
-    @PostMapping("/worky-suggestions")
+    @PostMapping("/sugerenciaworky")
     public ResponseEntity<Map<String, Object>> workySuggestions(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(workflowAiProxyService.workySuggestions(body));
     }
 }
+

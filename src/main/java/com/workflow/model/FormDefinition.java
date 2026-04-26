@@ -33,6 +33,6 @@ public class FormDefinition {
     }
 
     public enum FieldType {
-        TEXT, NUMBER, DATE,  FILE, CORREO
+        TEXT, NUMBER, DATE,  FILE, EMAIL
     }
 }
