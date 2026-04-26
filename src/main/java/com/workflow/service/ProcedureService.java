@@ -316,7 +316,7 @@ public class ProcedureService {
         String transitionHistoryAction = "ADVANCED";
         int transitionPathIndex = 1;
         while (toStage != null) {
-            if (isDecisionNode(toStage) || isLoopNode(toStage)) {
+            if (hasNodeType(toStage, "decision", "loop")) {
                 if (transitionPath.length <= transitionPathIndex) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes elegir una rama de la decision");
                 }
@@ -327,16 +327,16 @@ public class ProcedureService {
                 if (!passThroughStage.getId().equals(finalTransition.getFromStageId())) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision invalida");
                 }
-                if (isLoopNode(passThroughStage)) {
+                if (hasNodeType(passThroughStage, "loop")) {
                     transitionHistoryAction = resolveLoopHistoryAction(finalTransition);
-                } else if (isDecisionNode(passThroughStage)
+                } else if (hasNodeType(passThroughStage, "decision")
                         && "reject".equals(resolveBranchOutcome(passThroughStage, finalTransition))) {
                     transitionHistoryAction = "DECISION_REJECTED";
                 }
                 toStage = stageRepo.findById(finalTransition.getToStageId()).orElse(null);
                 continue;
             }
-            if (isForkNode(toStage)) {
+            if (hasNodeType(toStage, "fork")) {
                 // Auto-advance through fork: el trámite no se detiene en el nodo fork,
                 // va directo a la primera rama y handleForkSplitIfNeeded crea clones para las demás.
                 forkPassthroughId = toStage.getId();
@@ -390,7 +390,7 @@ public class ProcedureService {
         handleForkSplitIfNeeded(saved, fromStageForFork, finalTransition.getId(), userId);
 
         // Si llegamos a un nodo JOIN/UNION, sincronizar ramas paralelas
-        if (toStage != null && isJoinNode(toStage)) {
+        if (hasNodeType(toStage, "join")) {
             handleJoinSyncIfNeeded(saved, toStage, userId);
         }
 
@@ -410,7 +410,7 @@ public class ProcedureService {
      */
     private void handleForkSplitIfNeeded(Procedure procedure, String fromStageId, String usedTransitionId, String userId) {
         WorkflowStage fromStage = stageRepo.findById(fromStageId).orElse(null);
-        if (fromStage == null || !isForkNode(fromStage)) {
+        if (fromStage == null || !hasNodeType(fromStage, "fork")) {
             return;
         }
 
@@ -609,7 +609,7 @@ public class ProcedureService {
             }
 
             WorkflowStage directTarget = stageRepo.findById(transition.getToStageId()).orElse(null);
-            if (directTarget != null && (isDecisionNode(directTarget) || isLoopNode(directTarget))) {
+            if (hasNodeType(directTarget, "decision", "loop")) {
                 for (WorkflowTransition branch : transitions) {
                     if (!directTarget.getId().equals(branch.getFromStageId())) {
                         continue;
@@ -683,15 +683,9 @@ public class ProcedureService {
                                                         Set<String> visitedStageIds) {
         List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceStage, transitions, visitedStageIds);
         Map<String, Object> forwardConfig = transition.getForwardConfig();
-        String mode = forwardConfig != null && forwardConfig.get("mode") != null
-                ? String.valueOf(forwardConfig.get("mode"))
-                : "all";
-        boolean includeFiles = forwardConfig != null && Boolean.TRUE.equals(forwardConfig.get("includeFiles"));
-
-        Set<String> selectedFieldNames = new LinkedHashSet<>();
-        if (forwardConfig != null && forwardConfig.get("fieldNames") instanceof List<?> fieldNames) {
-            fieldNames.stream().map(String::valueOf).forEach(selectedFieldNames::add);
-        }
+        String mode = resolveForwardMode(forwardConfig);
+        boolean includeFiles = includeForwardFiles(forwardConfig);
+        Set<String> selectedFieldNames = resolveSelectedFields(forwardConfig);
 
         return sourceFields.stream()
                 .filter(field -> shouldIncludeField(field, mode, selectedFieldNames, includeFiles))
@@ -749,19 +743,31 @@ public class ProcedureService {
                                                                           Set<String> visitedStageIds) {
         List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceStage, transitions, visitedStageIds);
         Map<String, Object> forwardConfig = transition.getForwardConfig();
-        String mode = forwardConfig != null && forwardConfig.get("mode") != null
-                ? String.valueOf(forwardConfig.get("mode"))
-                : "all";
-        boolean includeFiles = forwardConfig != null && Boolean.TRUE.equals(forwardConfig.get("includeFiles"));
-
-        Set<String> selectedFieldNames = new LinkedHashSet<>();
-        if (forwardConfig != null && forwardConfig.get("fieldNames") instanceof List<?> fieldNames) {
-            fieldNames.stream().map(String::valueOf).forEach(selectedFieldNames::add);
-        }
+        String mode = resolveForwardMode(forwardConfig);
+        boolean includeFiles = includeForwardFiles(forwardConfig);
+        Set<String> selectedFieldNames = resolveSelectedFields(forwardConfig);
 
         return sourceFields.stream()
                 .filter(field -> shouldIncludeField(field, mode, selectedFieldNames, includeFiles))
                 .toList();
+    }
+
+    private String resolveForwardMode(Map<String, Object> forwardConfig) {
+        return forwardConfig != null && forwardConfig.get("mode") != null
+                ? String.valueOf(forwardConfig.get("mode"))
+                : "all";
+    }
+
+    private boolean includeForwardFiles(Map<String, Object> forwardConfig) {
+        return forwardConfig != null && Boolean.TRUE.equals(forwardConfig.get("includeFiles"));
+    }
+
+    private Set<String> resolveSelectedFields(Map<String, Object> forwardConfig) {
+        Set<String> selected = new LinkedHashSet<>();
+        if (forwardConfig != null && forwardConfig.get("fieldNames") instanceof List<?> fieldNames) {
+            fieldNames.stream().map(String::valueOf).forEach(selected::add);
+        }
+        return selected;
     }
 
     private List<FormDefinition.FormField> dedupeFields(List<FormDefinition.FormField> fields) {
@@ -834,27 +840,20 @@ public class ProcedureService {
     }
 
     private boolean isPassThroughNode(WorkflowStage stage) {
-        String nodeType = stage.getNodeType() == null ? "" : stage.getNodeType().toLowerCase();
-        return nodeType.equals("decision")
-                || nodeType.equals("fork")
-                || nodeType.equals("join")
-                || nodeType.equals("loop");
+        return hasNodeType(stage, "decision", "fork", "join", "loop");
     }
 
-    private boolean isDecisionNode(WorkflowStage stage) {
-        return stage != null && "decision".equalsIgnoreCase(stage.getNodeType());
-    }
-
-    private boolean isLoopNode(WorkflowStage stage) {
-        return stage != null && "loop".equalsIgnoreCase(stage.getNodeType());
-    }
-
-    private boolean isForkNode(WorkflowStage stage) {
-        return stage != null && "fork".equalsIgnoreCase(stage.getNodeType());
-    }
-
-    private boolean isJoinNode(WorkflowStage stage) {
-        return stage != null && "join".equalsIgnoreCase(stage.getNodeType());
+    private boolean hasNodeType(WorkflowStage stage, String... nodeTypes) {
+        if (stage == null || stage.getNodeType() == null) {
+            return false;
+        }
+        String value = stage.getNodeType().toLowerCase();
+        for (String nodeType : nodeTypes) {
+            if (value.equals(nodeType)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String resolveLoopHistoryAction(WorkflowTransition transition) {
@@ -873,14 +872,14 @@ public class ProcedureService {
             return null;
         }
         String branchName = branch.getName() == null ? "" : branch.getName().trim().toLowerCase();
-        if (isLoopNode(decisionStage)) {
+        if (hasNodeType(decisionStage, "loop")) {
             if (branchName.equals("repetir")) {
                 return "reject";
             }
             if (branchName.equals("salir")) {
                 return "accept";
             }
-        } else if (isDecisionNode(decisionStage)) {
+        } else if (hasNodeType(decisionStage, "decision")) {
             if (branchName.equals("si") || branchName.equals("sí") || branchName.equals("aprobado")
                     || branchName.equals("aceptado")) {
                 return "accept";

@@ -16,6 +16,7 @@ public class User {
         ADMIN,
         CLIENTE,
         ATENCION_CLIENTE,
+        VALIDADOR,
         TECNICO
     }
 

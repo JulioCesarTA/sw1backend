@@ -9,13 +9,12 @@ import com.workflow.repository.ProcedureRepository;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.JobRoleRepository;
 import com.workflow.repository.ProcedureHistoryRepository;
-import com.workflow.repository.UserRepository;
 import com.workflow.repository.WorkflowStageRepository;
-import com.workflow.repository.WorkflowRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,55 +26,24 @@ import java.util.stream.Collectors;
 public class ReportService {
 
     private final ProcedureRepository procedureRepo;
-    private final WorkflowRepository workflowRepo;
-    private final UserRepository userRepo;
     private final ProcedureHistoryRepository procedureHistoryRepo;
     private final WorkflowStageRepository workflowStageRepo;
     private final DepartmentRepository departmentRepo;
     private final JobRoleRepository jobRoleRepo;
 
     public Map<String, Object> getDashboardStats() {
-        List<Procedure> all = procedureRepo.findAll();
-        List<String> procedureIds = all.stream().map(Procedure::getId).toList();
-        List<ProcedureHistory> histories = procedureHistoryRepo.findByProcedureIdIn(procedureIds);
-        Map<String, WorkflowStage> stagesById = workflowStageRepo.findAll().stream()
+        List<Procedure> procedures = procedureRepo.findAll();
+        List<ProcedureHistory> histories = procedureHistoryRepo.findByProcedureIdIn(procedures.stream().map(Procedure::getId).toList());
+        Set<String> stageIds = collectStageReferenceIds(histories.stream().map(ProcedureHistory::getToStageId).toList());
+        Map<String, WorkflowStage> stagesById = workflowStageRepo.findAllById(stageIds).stream()
                 .collect(Collectors.toMap(WorkflowStage::getId, stage -> stage, (left, right) -> left));
-        Set<String> departmentIds = stagesById.values().stream()
-                .map(WorkflowStage::getResponsibleDepartmentId)
-                .filter(id -> id != null && !id.isBlank())
-                .collect(Collectors.toSet());
-        Set<String> jobRoleIds = stagesById.values().stream()
-                .map(WorkflowStage::getResponsibleJobRoleId)
-                .filter(id -> id != null && !id.isBlank())
-                .collect(Collectors.toSet());
+        Set<String> departmentIds = collectStageReferenceIds(stagesById.values().stream().map(WorkflowStage::getResponsibleDepartmentId).toList());
+        Set<String> jobRoleIds = collectStageReferenceIds(stagesById.values().stream().map(WorkflowStage::getResponsibleJobRoleId).toList());
         Map<String, String> departmentNames = departmentRepo.findAllById(departmentIds).stream()
                 .collect(Collectors.toMap(Department::getId, Department::getName));
         Map<String, String> jobRoleNames = jobRoleRepo.findAllById(jobRoleIds).stream()
                 .collect(Collectors.toMap(JobRole::getId, JobRole::getName));
-
-        long total = all.size();
-        long pending = all.stream().filter(p -> p.getStatus() == Procedure.Status.PENDING).count();
-        long inProgress = all.stream().filter(p -> p.getStatus() == Procedure.Status.IN_PROGRESS).count();
-        long observed = all.stream().filter(p -> p.getStatus() == Procedure.Status.OBSERVED).count();
-        long approved = all.stream().filter(p -> p.getStatus() == Procedure.Status.APPROVED).count();
-        long completed = all.stream().filter(p -> p.getStatus() == Procedure.Status.COMPLETED).count();
-        long rejected = all.stream().filter(p -> p.getStatus() == Procedure.Status.REJECTED).count();
-        long workflows = workflowRepo.findAll().size();
-        long users = userRepo.findAll().size();
-
-        Map<String, Long> byStatus = new LinkedHashMap<>();
-        byStatus.put("PENDING", pending);
-        byStatus.put("IN_PROGRESS", inProgress);
-        byStatus.put("OBSERVED", observed);
-        byStatus.put("APPROVED", approved);
-        byStatus.put("COMPLETED", completed);
-        byStatus.put("REJECTED", rejected);
-
-        Map<String, Long> byWorkflow = all.stream()
-                .collect(Collectors.groupingBy(
-                        p -> p.getWorkflowId() != null ? p.getWorkflowId() : "unknown",
-                        Collectors.counting()
-                ));
+        Map<String, Long> byStatus = countByStatus(procedures);
 
         Map<String, RolePerformanceAccumulator> rolePerformance = new LinkedHashMap<>();
         Map<String, Long> departmentFlow = new LinkedHashMap<>();
@@ -114,11 +82,8 @@ public class ReportService {
         }
 
         Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("totalProcedures", total);
-        stats.put("totalWorkflows", workflows);
-        stats.put("totalUsers", users);
+        stats.put("totalProcedures", procedures.size());
         stats.put("byStatus", byStatus);
-        stats.put("byWorkflow", byWorkflow);
         stats.put("rolePerformance", rolePerformance.values().stream()
                 .sorted(Comparator
                         .comparingInt(RolePerformanceAccumulator::lateCount).reversed()
@@ -138,17 +103,18 @@ public class ReportService {
         return stats;
     }
 
-    public List<Map<String, Object>> getProceduresByWorkflow() {
-        Map<String, Long> countByWorkflow = procedureRepo.findAll().stream()
-                .filter(p -> p.getWorkflowId() != null)
-                .collect(Collectors.groupingBy(Procedure::getWorkflowId, Collectors.counting()));
-        return workflowRepo.findAll().stream().map(wf -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("workflowId", wf.getId());
-            m.put("workflowName", wf.getName());
-            m.put("total", countByWorkflow.getOrDefault(wf.getId(), 0L));
-            return m;
-        }).toList();
+    private Set<String> collectStageReferenceIds(List<String> ids) {
+        return ids.stream().filter(id -> id != null && !id.isBlank()).collect(Collectors.toSet());
+    }
+
+    private Map<String, Long> countByStatus(List<Procedure> procedures) {
+        Map<Procedure.Status, Long> counts = procedures.stream()
+                .collect(Collectors.groupingBy(Procedure::getStatus, () -> new EnumMap<>(Procedure.Status.class), Collectors.counting()));
+        Map<String, Long> byStatus = new LinkedHashMap<>();
+        for (Procedure.Status status : Procedure.Status.values()) {
+            byStatus.put(status.name(), counts.getOrDefault(status, 0L));
+        }
+        return byStatus;
     }
 
     private static final class RolePerformanceAccumulator {

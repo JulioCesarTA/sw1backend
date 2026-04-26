@@ -1,7 +1,6 @@
 package com.workflow.controller;
 
 import com.workflow.model.User;
-import com.workflow.service.ReportService;
 import com.workflow.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,7 +17,6 @@ import java.util.Map;
 public class WorkflowController {
 
     private final WorkflowService workflowService;
-    private final ReportService reportService;
 
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> findAll(@AuthenticationPrincipal User user) {
@@ -48,13 +46,5 @@ public class WorkflowController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/report-dashboard")
-    public ResponseEntity<Map<String, Object>> reportDashboard() {
-        return ResponseEntity.ok(reportService.getDashboardStats());
-    }
-
-    @GetMapping("/report-by-workflow")
-    public ResponseEntity<List<Map<String, Object>>> reportByWorkflow() {
-        return ResponseEntity.ok(reportService.getProceduresByWorkflow());
-    }
+   
 }
