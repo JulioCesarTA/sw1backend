@@ -68,9 +68,17 @@ public class ProcedureService {
                         .collect(Collectors.toList())
                 : List.of();
 
-        // Collect all active stage IDs: root current + each active clone's current
+        // Collect all active stage IDs: root current + each active clone's current.
+        // If the root is parked on a pass-through node while parallel branches are still
+        // running, prefer showing the real branch stages as active instead of the logical node.
         Set<String> activeStageIds = new java.util.HashSet<>();
-        if (isActive && procedure.getCurrentStageId() != null) {
+        WorkflowStage rootCurrentStage = isActive && procedure.getCurrentStageId() != null
+                ? stageRepo.findById(procedure.getCurrentStageId()).orElse(null)
+                : null;
+        boolean rootIsWaitingOnPassThrough = rootCurrentStage != null
+                && isPassThroughNode(rootCurrentStage)
+                && !activeClones.isEmpty();
+        if (isActive && procedure.getCurrentStageId() != null && !rootIsWaitingOnPassThrough) {
             activeStageIds.add(procedure.getCurrentStageId());
         }
         activeClones.forEach(c -> activeStageIds.add(c.getCurrentStageId()));
@@ -116,6 +124,12 @@ public class ProcedureService {
         List<Map<String, Object>> enrichedHistory = new ArrayList<>();
         for (ProcedureHistory h : history) {
             WorkflowStage stage = h.getToStageId() != null ? stageMap.get(h.getToStageId()) : null;
+            boolean hidePassThroughEntry = stage != null
+                    && isPassThroughNode(stage)
+                    && ("ADVANCED".equals(h.getAction()) || "JOIN_ADVANCED".equals(h.getAction()));
+            if (hidePassThroughEntry) {
+                continue;
+            }
             boolean isCurrent = currentHistoryIds.contains(h.getId());
             if (h.getToStageId() != null) coveredStageIds.add(h.getToStageId());
             Map<String, Object> entry = new LinkedHashMap<>();
@@ -276,6 +290,7 @@ public class ProcedureService {
         String[] transitionPath = transitionId == null ? new String[0] : transitionId.split(">>");
         WorkflowTransition transition = transitionRepo.findById(transitionPath.length > 0 ? transitionPath[0] : transitionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transicion no encontrada"));
+        List<WorkflowTransition> workflowTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(procedure.getWorkflowId());
 
         if (!transition.getFromStageId().equals(procedure.getCurrentStageId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transicion invalida para la etapa actual");
@@ -286,35 +301,45 @@ public class ProcedureService {
         WorkflowStage passThroughStage = stageRepo.findById(transition.getToStageId()).orElse(null);
         WorkflowStage toStage = passThroughStage;
         String forkPassthroughId = null;
-        String loopHistoryAction = null;
-        String loopHistoryComment = null;
-        if (passThroughStage != null && (isDecisionNode(passThroughStage) || isLoopNode(passThroughStage))) {
-            if (transitionPath.length < 2) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes elegir una rama de la decision");
+        String transitionHistoryAction = "ADVANCED";
+        int transitionPathIndex = 1;
+        while (toStage != null) {
+            if (isDecisionNode(toStage) || isLoopNode(toStage)) {
+                if (transitionPath.length <= transitionPathIndex) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes elegir una rama de la decision");
+                }
+                passThroughStage = toStage;
+                finalTransition = transitionRepo.findById(transitionPath[transitionPathIndex])
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision no encontrada"));
+                transitionPathIndex++;
+                if (!passThroughStage.getId().equals(finalTransition.getFromStageId())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision invalida");
+                }
+                if (isLoopNode(passThroughStage)) {
+                    transitionHistoryAction = resolveLoopHistoryAction(finalTransition);
+                } else if (isDecisionNode(passThroughStage)
+                        && "reject".equals(resolveBranchOutcome(passThroughStage, finalTransition))) {
+                    transitionHistoryAction = "DECISION_REJECTED";
+                }
+                toStage = stageRepo.findById(finalTransition.getToStageId()).orElse(null);
+                continue;
             }
-            finalTransition = transitionRepo.findById(transitionPath[1])
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision no encontrada"));
-            if (!passThroughStage.getId().equals(finalTransition.getFromStageId())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision invalida");
-            }
-            if (isLoopNode(passThroughStage)) {
-                loopHistoryAction = resolveLoopHistoryAction(finalTransition);
-                loopHistoryComment = finalTransition.getName();
-            }
-            toStage = stageRepo.findById(finalTransition.getToStageId()).orElse(null);
-        } else if (toStage != null && isForkNode(toStage)) {
-            // Auto-advance through fork: el trámite no se detiene en el nodo fork,
-            // va directo a la primera rama y handleForkSplitIfNeeded crea clones para las demás.
-            forkPassthroughId = toStage.getId();
-            final String forkId = toStage.getId();
-            List<WorkflowTransition> allWfTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(procedure.getWorkflowId());
-            WorkflowTransition firstBranch = allWfTransitions.stream()
+            if (isForkNode(toStage)) {
+                // Auto-advance through fork: el trámite no se detiene en el nodo fork,
+                // va directo a la primera rama y handleForkSplitIfNeeded crea clones para las demás.
+                forkPassthroughId = toStage.getId();
+                final String forkId = toStage.getId();
+                WorkflowTransition firstBranch = workflowTransitions.stream()
                     .filter(t -> forkId.equals(t.getFromStageId()))
                     .findFirst().orElse(null);
-            if (firstBranch != null) {
+                if (firstBranch == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La bifurcacion no tiene ramas configuradas");
+                }
                 finalTransition = firstBranch;
                 toStage = stageRepo.findById(firstBranch.getToStageId()).orElse(null);
+                continue;
             }
+            break;
         }
 
         procedure.setCurrentStageId(finalTransition.getToStageId());
@@ -334,14 +359,11 @@ public class ProcedureService {
 
         String comment = (String) body.getOrDefault("comment", "");
         Procedure saved = procedureRepo.save(procedure);
-        if (loopHistoryAction != null && passThroughStage != null) {
-            recordHistory(saved.getId(), previousStageId, passThroughStage.getId(), loopHistoryAction, userId, loopHistoryComment);
-        }
         recordHistory(
                 saved.getId(),
-                loopHistoryAction != null && passThroughStage != null ? passThroughStage.getId() : previousStageId,
+                passThroughStage != null && isPassThroughNode(passThroughStage) ? passThroughStage.getId() : previousStageId,
                 finalTransition.getToStageId(),
-                "ADVANCED",
+                transitionHistoryAction,
                 userId,
                 comment
         );
@@ -360,7 +382,11 @@ public class ProcedureService {
         if (publishReports) {
             reportRealtimeService.scheduleDashboardUpdate();
         }
-        return findOne(saved.getId());
+        String responseProcedureId = saved.getId();
+        if (saved.getParentProcedureId() != null && !procedureRepo.existsById(saved.getId())) {
+            responseProcedureId = saved.getParentProcedureId();
+        }
+        return findOne(responseProcedureId);
     }
 
     /**
@@ -398,6 +424,8 @@ public class ProcedureService {
             Procedure savedClone = procedureRepo.save(clone);
             recordHistory(savedClone.getId(), fromStageId, branch.getToStageId(),
                     "FORK_BRANCH", userId, "Rama creada por bifurcacion desde " + fromStage.getName());
+            recordHistory(rootId, fromStageId, branch.getToStageId(),
+                    "ADVANCED", userId, "Rama paralela en curso");
 
             WorkflowStage branchStage = stageRepo.findById(branch.getToStageId()).orElse(null);
             if (branchStage != null) {
@@ -484,7 +512,7 @@ public class ProcedureService {
         }
 
         WorkflowStage currentStage = stageRepo.findById(procedure.getCurrentStageId()).orElse(null);
-        if (currentStage == null || !matchesStageResponsibility(currentStage, actor, userJobRoleId)) {
+        if (currentStage == null || isPassThroughNode(currentStage) || !matchesStageResponsibility(currentStage, actor, userJobRoleId)) {
             return null;
         }
 
