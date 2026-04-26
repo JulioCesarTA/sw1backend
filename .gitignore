@@ -1,0 +1,21 @@
+target/
+
+# Node / frontend-style dependencies if they ever appear here
+node_modules/
+
+# Local environment and secrets
+.env
+*.token
+
+# Logs and temp artifacts
+*.log
+*.out
+*.err
+tmp_report_inspect/
+
+# IDE / OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

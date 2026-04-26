@@ -1,0 +1,81 @@
+package com.workflow.auth.service;
+
+import com.workflow.model.User;
+import com.workflow.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
+
+    public Map<String, Object> login(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas"));
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
+        }
+
+        String accessToken = jwtService.generateAccessToken(user.getId(), user.getRole().name());
+        String refreshToken = jwtService.generateRefreshToken(user.getId());
+
+        user.setRefreshTokenHash(passwordEncoder.encode(refreshToken));
+        userRepository.save(user);
+
+        return Map.of(
+                "accessToken", accessToken,
+                "refreshToken", refreshToken,
+                "user", sanitize(user)
+        );
+    }
+
+    public Map<String, String> refresh(String refreshToken) {
+        if (!jwtService.isTokenValid(refreshToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token inválido");
+        }
+        String userId = jwtService.extractUserId(refreshToken);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
+
+        if (user.getRefreshTokenHash() == null ||
+                !passwordEncoder.matches(refreshToken, user.getRefreshTokenHash())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token inválido");
+        }
+
+        String newAccess = jwtService.generateAccessToken(user.getId(), user.getRole().name());
+        return Map.of("accessToken", newAccess);
+    }
+
+    public void logout(String userId) {
+        userRepository.findById(userId).ifPresent(user -> {
+            user.setRefreshTokenHash(null);
+            userRepository.save(user);
+        });
+    }
+
+    public Map<String, Object> me(User user) {
+        return sanitize(user);
+    }
+
+    private Map<String, Object> sanitize(User user) {
+        return Map.of(
+                "id", user.getId(),
+                "name", user.getName(),
+                "email", user.getEmail(),
+                "role", user.getRole().name(),
+                "companyId", user.getCompanyId() == null ? "" : user.getCompanyId(),
+                "departmentId", user.getDepartmentId() == null ? "" : user.getDepartmentId(),
+                "jobTitle", user.getJobTitle() == null ? "" : user.getJobTitle()
+        );
+    }
+}

@@ -1,0 +1,43 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: workflow-backend
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb+srv://root:Julioavila123@cluster0.y8xvodm.mongodb.net/workflow_db?retryWrites=true&w=majority&appName=Cluster0}
+      auto-index-creation: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:supersecretkey_workflow_2024_cambiar_en_produccion}
+    access-expiration-ms: 900000        # 15 min
+    refresh-expiration-ms: 604800000    # 7 days
+  cors:
+    allowed-origins: ${FRONTEND_URL:http://localhost}
+  upload:
+    dir: ${UPLOAD_DIR:uploads}
+  aws:
+    access-key-id: ${AWS_ACCESS_KEY_ID:}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+    region: ${AWS_REGION:us-east-2}
+    bucket-name: ${AWS_BUCKET_NAME:}
+    key-prefix: ${AWS_KEY_PREFIX:workflow-files}
+  claude:
+    api-key: ${CLAUDE_API_KEY:}
+  ai:
+    base-url: ${AI_BASE_URL:http://localhost:8001}
+
+logging:
+  level:
+    com.workflow: DEBUG
+    org.springframework.data.mongodb: INFO
