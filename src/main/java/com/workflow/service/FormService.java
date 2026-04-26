@@ -34,10 +34,8 @@ public class FormService {
             ff.setId((String) f.get("id"));
             String rawType = String.valueOf(f.getOrDefault("type", "TEXT")).toUpperCase();
             ff.setType(FormDefinition.FieldType.valueOf(rawType));
-            ff.setLabel((String) f.get("label"));
             ff.setName((String) f.getOrDefault("name", f.get("id")));
             ff.setRequired(Boolean.TRUE.equals(f.get("required")) || Boolean.TRUE.equals(f.get("isRequired")));
-            ff.setPlaceholder((String) f.get("placeholder"));
             @SuppressWarnings("unchecked")
             List<String> options = (List<String>) f.get("options");
             ff.setOptions(options);

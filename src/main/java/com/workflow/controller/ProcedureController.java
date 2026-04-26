@@ -22,7 +22,7 @@ public class ProcedureController {
 
     @GetMapping
     public ResponseEntity<List<Procedure>> findAll(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(procedureService.findAll(user.getId(), user.getRole()));
+        return ResponseEntity.ok(procedureService.findAll(user));
     }
 
     @GetMapping("/{id}")

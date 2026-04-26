@@ -56,6 +56,36 @@ public class AuthService {
         return Map.of("accessToken", newAccess);
     }
 
+    public Map<String, Object> register(String name, String email, String password) {
+        if (userRepository.existsByEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
+        }
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRole(User.Role.CLIENTE);
+        User saved = userRepository.save(user);
+
+        String accessToken = jwtService.generateAccessToken(saved.getId(), saved.getRole().name());
+        String refreshToken = jwtService.generateRefreshToken(saved.getId());
+        saved.setRefreshTokenHash(passwordEncoder.encode(refreshToken));
+        userRepository.save(saved);
+
+        return Map.of(
+                "accessToken", accessToken,
+                "refreshToken", refreshToken,
+                "user", sanitize(saved)
+        );
+    }
+
+    public void saveFcmToken(String userId, String fcmToken) {
+        userRepository.findById(userId).ifPresent(user -> {
+            user.setFcmToken(fcmToken);
+            userRepository.save(user);
+        });
+    }
+
     public void logout(String userId) {
         userRepository.findById(userId).ifPresent(user -> {
             user.setRefreshTokenHash(null);

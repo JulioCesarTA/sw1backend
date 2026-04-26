@@ -18,8 +18,14 @@ public class UserService {
     private final UserRepository userRepo;
     private final PasswordEncoder passwordEncoder;
 
-    public List<User> findAll() {
-        return userRepo.findAll();
+    public List<User> findAll(User actor) {
+        if (actor.getRole() == User.Role.SUPERADMIN) {
+            return userRepo.findAll();
+        }
+        if (actor.getCompanyId() == null || actor.getCompanyId().isBlank()) {   
+            return List.of();
+        }
+        return userRepo.findByCompanyIdOrderByNameAsc(actor.getCompanyId());
     }
 
     public User findOne(String id) {
@@ -27,24 +33,33 @@ public class UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
     }
 
-    public User create(Map<String, Object> body) {
+    public User create(Map<String, Object> body, User actor) {
         String email = (String) body.get("email");
         if (userRepo.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya esta registrado");
         }
+        String companyId = actor.getRole() == User.Role.SUPERADMIN
+                ? (String) body.get("companyId")
+                : actor.getCompanyId();
         User user = new User();
         user.setName((String) body.get("name"));
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode((String) body.get("password")));
         user.setRole(User.Role.valueOf(((String) body.getOrDefault("role", "ATENCION_CLIENTE")).toUpperCase()));
-        user.setCompanyId((String) body.get("companyId"));
+        user.setCompanyId(companyId);
         user.setDepartmentId((String) body.get("departmentId"));
         user.setJobTitle((String) body.get("jobTitle"));
         return userRepo.save(user);
     }
 
-    public User update(String id, Map<String, Object> body) {
+    public User update(String id, Map<String, Object> body, User actor) {
         User user = findOne(id);
+        if (actor.getRole() != User.Role.SUPERADMIN) {
+            if (actor.getCompanyId() == null || !actor.getCompanyId().equals(user.getCompanyId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a este usuario");
+            }
+            body.put("companyId", actor.getCompanyId());
+        }
         if (body.containsKey("name")) user.setName((String) body.get("name"));
         if (body.containsKey("email")) user.setEmail((String) body.get("email"));
         if (body.containsKey("role")) user.setRole(User.Role.valueOf(((String) body.get("role")).toUpperCase()));

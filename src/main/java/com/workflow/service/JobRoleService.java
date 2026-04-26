@@ -39,7 +39,6 @@ public class JobRoleService {
         jobRole.setCompanyId(department.getCompanyId());
         jobRole.setDepartmentId(department.getId());
         jobRole.setName((String) body.get("name"));
-        jobRole.setDescription((String) body.get("description"));
         return jobRoleRepository.save(jobRole);
     }
 
@@ -53,7 +52,6 @@ public class JobRoleService {
             jobRole.setCompanyId(department.getCompanyId());
         }
         if (body.containsKey("name")) jobRole.setName((String) body.get("name"));
-        if (body.containsKey("description")) jobRole.setDescription((String) body.get("description"));
         return jobRoleRepository.save(jobRole);
     }
 

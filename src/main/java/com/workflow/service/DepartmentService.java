@@ -38,7 +38,6 @@ public class DepartmentService {
         Department department = new Department();
         department.setCompanyId(company.getId());
         department.setName((String) body.get("name"));
-        department.setDescription((String) body.get("description"));
         return departmentRepo.save(department);
     }
 
@@ -51,7 +50,6 @@ public class DepartmentService {
             department.setCompanyId(companyId);
         }
         if (body.containsKey("name")) department.setName((String) body.get("name"));
-        if (body.containsKey("description")) department.setDescription((String) body.get("description"));
         return departmentRepo.save(department);
     }
 

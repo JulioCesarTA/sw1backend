@@ -42,25 +42,26 @@ public class WorkflowAiProxyService {
 
     private Map<String, Object> post(String path, Map<String, Object> body) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(aiBaseUrl + path))
-                    .timeout(Duration.ofSeconds(120))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(
+                    HttpRequest.newBuilder()
+                            .uri(URI.create(aiBaseUrl + path))
+                            .timeout(Duration.ofSeconds(120))
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new ResponseStatusException(resolveStatus(response.statusCode()), response.body());
             }
             return objectMapper.readValue(response.body(), new TypeReference<>() {});
-        } catch (ResponseStatusException e) {
-            throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo conectar con el servicio de IA: " + e.getMessage());
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo conectar con el servicio de IA: " + e.getMessage());
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error proxy del servicio de IA: " + e.getMessage());
         }

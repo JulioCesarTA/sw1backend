@@ -21,6 +21,25 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(body.get("email"), body.get("password")));
     }
 
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(authService.register(
+                body.get("name"),
+                body.get("email"),
+                body.get("password")
+        ));
+    }
+
+    @PostMapping("/fcm-token")
+    public ResponseEntity<Void> saveFcmToken(
+            @AuthenticationPrincipal User user,
+            @RequestBody Map<String, String> body) {
+        if (user != null) {
+            authService.saveFcmToken(user.getId(), body.get("fcmToken"));
+        }
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<Map<String, String>> refresh(@RequestBody Map<String, String> body) {
         return ResponseEntity.ok(authService.refresh(body.get("refreshToken")));

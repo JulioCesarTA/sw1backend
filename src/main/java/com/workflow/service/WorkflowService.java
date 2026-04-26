@@ -66,7 +66,6 @@ public class WorkflowService {
             map.put("description", wf.getDescription());
             map.put("companyId", wf.getCompanyId());
             map.put("companyName", wf.getCompanyId() != null ? companyNames.get(wf.getCompanyId()) : null);
-            map.put("createdAt", wf.getCreatedAt());
             map.put("stages", stages);
             map.put("_count", Map.of("procedures", 0, "stages", stages.size()));
             return map;
@@ -284,10 +283,8 @@ public class WorkflowService {
 
             FormDefinition.FormField mapped = new FormDefinition.FormField();
             mapped.setId((String) field.get("id"));
-            mapped.setLabel((String) field.get("label"));
             mapped.setName((String) field.getOrDefault("name", field.get("id")));
             mapped.setType(parseFieldType(field.get("type")));
-            mapped.setPlaceholder((String) field.get("placeholder"));
 
             Object options = field.get("options");
             if (options instanceof List<?> optionList) {
@@ -398,7 +395,6 @@ public class WorkflowService {
         map.put("description", workflow.getDescription());
         map.put("companyId", workflow.getCompanyId());
         map.put("companyName", company != null ? company.getName() : null);
-        map.put("createdAt", workflow.getCreatedAt());
         map.put("stages", stagesMapped);
         map.put("transitions", transitions);
         map.put("_count", Map.of("procedures", 0, "stages", stages.size()));

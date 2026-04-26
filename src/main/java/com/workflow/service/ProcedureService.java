@@ -14,6 +14,7 @@ import com.workflow.repository.FormDefinitionRepository;
 import com.workflow.repository.JobRoleRepository;
 import com.workflow.repository.ProcedureHistoryRepository;
 import com.workflow.repository.ProcedureRepository;
+import com.workflow.repository.UserRepository;
 import com.workflow.repository.WorkflowRepository;
 import com.workflow.repository.WorkflowStageRepository;
 import com.workflow.repository.WorkflowTransitionRepository;
@@ -43,13 +44,24 @@ public class ProcedureService {
     private final FormDefinitionRepository formRepo;
     private final JobRoleRepository jobRoleRepo;
     private final DepartmentRepository departmentRepo;
+    private final UserRepository userRepository;
+    private final FcmService fcmService;
     private final ReportRealtimeService reportRealtimeService;
 
-    public List<Procedure> findAll(String userId, User.Role role) {
-        if (role == User.Role.ADMIN) {
+    public List<Procedure> findAll(User user) {
+        if (user.getRole() == User.Role.ADMIN || user.getRole() == User.Role.SUPERADMIN) {
             return procedureRepo.findAll();
         }
-        return procedureRepo.findByAssignedUserIdOrRequestedById(userId, userId);
+        if (user.getRole() == User.Role.CLIENTE) {
+            String email = user.getEmail();
+            if (email == null || email.isBlank()) return List.of();
+            return procedureRepo.findAll().stream()
+                    .filter(p -> p.getFormData() != null &&
+                            p.getFormData().values().stream()
+                                    .anyMatch(v -> email.equalsIgnoreCase(v != null ? v.toString() : null)))
+                    .toList();
+        }
+        return procedureRepo.findByAssignedUserIdOrRequestedById(user.getId(), user.getId());
     }
 
     public Map<String, Object> findOne(String id) {
@@ -344,7 +356,8 @@ public class ProcedureService {
 
         procedure.setCurrentStageId(finalTransition.getToStageId());
         boolean isFinal = toStage != null && "END".equalsIgnoreCase(toStage.getNodeType());
-        procedure.setStatus(isFinal ? Procedure.Status.COMPLETED : Procedure.Status.IN_PROGRESS);
+        Procedure.Status newStatus = isFinal ? Procedure.Status.COMPLETED : Procedure.Status.IN_PROGRESS;
+        procedure.setStatus(newStatus);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> formData = (Map<String, Object>) body.get("formData");
@@ -367,7 +380,9 @@ public class ProcedureService {
                 userId,
                 comment
         );
-        if (toStage != null) {
+        if (isFinal) {
+            sendStatusNotification(saved, "Trámite completado",
+                    "Tu trámite " + saved.getCode() + " ha sido completado exitosamente.");
         }
 
         // Si el siguiente nodo era un FORK (auto-advance) o si veníamos de un FORK, crear ramas paralelas
@@ -440,6 +455,8 @@ public class ProcedureService {
         Procedure saved = procedureRepo.save(procedure);
         String reason = (String) body.getOrDefault("reason", "Rechazado");
         recordHistory(saved.getId(), procedure.getCurrentStageId(), null, "REJECTED", userId, reason);
+        sendStatusNotification(saved, "Trámite rechazado",
+                "Tu trámite " + saved.getCode() + " ha sido rechazado.");
         reportRealtimeService.scheduleDashboardUpdate();
         return saved;
     }
@@ -453,6 +470,48 @@ public class ProcedureService {
 
     public List<ProcedureHistory> getHistory(String procedureId) {
         return historyRepo.findByProcedureIdOrderByChangedAtAsc(procedureId);
+    }
+
+    private void sendStatusNotification(Procedure procedure, String title, String body) {
+        String email = findCorreoEmailFromProcedure(procedure);
+        if (email == null || email.isBlank()) return;
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
+                fcmService.sendNotification(user.getFcmToken(), title, body);
+            }
+        });
+    }
+
+    private String findCorreoEmailFromProcedure(Procedure procedure) {
+        List<WorkflowStage> stages = stageRepo.findByWorkflowIdOrderByOrderAsc(procedure.getWorkflowId());
+
+        WorkflowStage startStage = stages.stream()
+                .filter(s -> "start".equalsIgnoreCase(s.getNodeType()))
+                .findFirst()
+                .orElse(stages.isEmpty() ? null : stages.get(0));
+
+        if (startStage == null) return null;
+
+        List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(procedure.getWorkflowId());
+        String startId = startStage.getId();
+        WorkflowTransition fromStart = transitions.stream()
+                .filter(t -> startId.equals(t.getFromStageId()))
+                .findFirst().orElse(null);
+
+        if (fromStart == null) return null;
+
+        FormDefinition form = formRepo.findByStageId(fromStart.getToStageId()).orElse(null);
+        if (form == null || form.getFields() == null) return null;
+
+        FormDefinition.FormField correoField = form.getFields().stream()
+                .filter(f -> FormDefinition.FieldType.CORREO.equals(f.getType()))
+                .findFirst().orElse(null);
+
+        if (correoField == null) return null;
+
+        if (procedure.getFormData() == null) return null;
+        Object emailValue = procedure.getFormData().get(correoField.getName());
+        return emailValue != null ? emailValue.toString() : null;
     }
 
     private String generateCode() {
@@ -642,7 +701,7 @@ public class ProcedureService {
                         return null;
                     }
                     Map<String, Object> map = new LinkedHashMap<>();
-                    map.put("label", field.getLabel());
+                    map.put("label", field.getName());
                     map.put("name", field.getName());
                     map.put("type", field.getType());
                     map.put("value", value);

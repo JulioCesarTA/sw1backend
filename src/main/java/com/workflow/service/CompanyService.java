@@ -27,22 +27,14 @@ public class CompanyService {
 
     public Company create(Map<String, Object> body) {
         String name = (String) body.get("name");
-        if (name == null || name.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre es obligatorio");
-        }
-        if (companyRepo.existsByName(name)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "La empresa ya existe");
-        }
         Company company = new Company();
         company.setName(name);
-        company.setDescription((String) body.get("description"));
         return companyRepo.save(company);
     }
 
     public Company update(String id, Map<String, Object> body) {
         Company company = findOne(id);
         if (body.containsKey("name")) company.setName((String) body.get("name"));
-        if (body.containsKey("description")) company.setDescription((String) body.get("description"));
         return companyRepo.save(company);
     }
 
