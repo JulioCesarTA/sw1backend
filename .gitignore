@@ -19,3 +19,8 @@ tmp_report_inspect/
 *.iml
 .DS_Store
 Thumbs.db
+
+# Python AI service artifacts
+IA/.venv/
+IA/__pycache__/
+IA/*.pyc
