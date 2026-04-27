@@ -28,11 +28,6 @@ public class UserService {
         return userRepo.findByCompanyIdOrderByNameAsc(actor.getCompanyId());
     }
 
-    public User findOne(String id) {
-        return userRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
-    }
-
     public User create(Map<String, Object> body, User actor) {
         String email = (String) body.get("email");
         if (userRepo.existsByEmail(email)) {
@@ -53,7 +48,8 @@ public class UserService {
     }
 
     public User update(String id, Map<String, Object> body, User actor) {
-        User user = findOne(id);
+        User user = userRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         if (actor.getRole() != User.Role.SUPERADMIN) {
             if (actor.getCompanyId() == null || !actor.getCompanyId().equals(user.getCompanyId())) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a este usuario");
@@ -68,10 +64,5 @@ public class UserService {
         if (body.containsKey("jobRoleId")) user.setJobRoleId((String) body.get("jobRoleId"));
         if (body.containsKey("password")) user.setPassword(passwordEncoder.encode((String) body.get("password")));
         return userRepo.save(user);
-    }
-
-    public void remove(String id) {
-        findOne(id);
-        userRepo.deleteById(id);
     }
 }

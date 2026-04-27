@@ -21,12 +21,6 @@ public class CompanyController {
     public ResponseEntity<List<Company>> findAll() {
         return ResponseEntity.ok(companyService.findAll());
     }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Company> findOne(@PathVariable String id) {
-        return ResponseEntity.ok(companyService.findOne(id));
-    }
-
     @PostMapping
     public ResponseEntity<Company> create(@RequestBody Map<String, Object> body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(companyService.create(body));
@@ -37,9 +31,4 @@ public class CompanyController {
         return ResponseEntity.ok(companyService.update(id, body));
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> remove(@PathVariable String id) {
-        companyService.remove(id);
-        return ResponseEntity.noContent().build();
-    }
 }

@@ -194,26 +194,75 @@ public class TramiteService {
 
         Set<String> workflowIds = tramites.stream().map(Tramite::getWorkflowId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<String, Workflow> workflowMap = workflowRepo.findAllById(workflowIds).stream()
-                .collect(Collectors.toMap(Workflow::getId, w -> w));
+                .collect(Collectors.toMap(Workflow::getId, workflow -> workflow));
 
         Set<String> stageIds = tramites.stream().map(Tramite::getCurrentStageId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<String, WorkflowStage> stageMap = stageRepo.findAllById(stageIds).stream()
-                .collect(Collectors.toMap(WorkflowStage::getId, s -> s));
+                .collect(Collectors.toMap(WorkflowStage::getId, stage -> stage));
 
         return tramites.stream()
-                .map(p -> toActivitySummary(p, actor, workflowMap, stageMap))
-                .filter(Objects::nonNull)
+                .filter(tramite -> tramite.getStatus() != Tramite.Status.COMPLETADO && tramite.getStatus() != Tramite.Status.RECHAZADO)
+                .map(tramite -> Map.entry(tramite, workflowMap.get(tramite.getWorkflowId())))
+                .filter(entry -> entry.getValue() != null && hasWorkflowAccess(actor, entry.getValue()))
+                .map(entry -> Map.entry(entry.getKey(), stageMap.get(entry.getKey().getCurrentStageId())))
+                .filter(entry -> entry.getValue() != null
+                        && !isPassThroughNode(entry.getValue())
+                        && matchesStageResponsibility(entry.getValue(), actor))
+                .map(entry -> {
+                    Tramite tramite = entry.getKey();
+                    WorkflowStage stage = entry.getValue();
+                    Workflow workflow = workflowMap.get(tramite.getWorkflowId());
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("id", tramite.getId());
+                    map.put("code", tramite.getCode());
+                    map.put("title", tramite.getTitle());
+                    map.put("status", tramite.getStatus());
+                    map.put("workflowId", workflow.getId());
+                    map.put("workflowName", workflow.getName());
+                    map.put("currentStageId", stage.getId());
+                    map.put("currentStageName", stage.getName());
+                    map.put("createdAt", tramite.getCreatedAt());
+                    map.put("updatedAt", tramite.getUpdatedAt());
+                    return map;
+                })
                 .toList();
     }
 
     public Map<String, Object> findActivity(String id, User actor) {
         Tramite tramite = tramiteRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Actividad no encontrada"));
-        Map<String, Object> detail = toActivityDetail(tramite, actor);
-        if (detail == null) {
+        Workflow workflow = workflowRepo.findById(tramite.getWorkflowId()).orElse(null);
+        if (workflow == null || !hasWorkflowAccess(actor, workflow)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta actividad");
         }
-        return detail;
+
+        WorkflowStage currentStage = stageRepo.findById(tramite.getCurrentStageId()).orElse(null);
+        if (currentStage == null || isPassThroughNode(currentStage) || !matchesStageResponsibility(currentStage, actor)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta actividad");
+        }
+
+        List<HistorialTramite> history = historyRepo.findByTramiteIdOrderByChangedAtAsc(tramite.getId());
+        List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflow.getId());
+        FormDefinition formDefinition = formRepo.findByStageId(currentStage.getId()).orElse(null);
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", tramite.getId());
+        map.put("code", tramite.getCode());
+        map.put("title", tramite.getTitle());
+        map.put("description", tramite.getDescription());
+        map.put("status", tramite.getStatus());
+        map.put("workflowId", workflow.getId());
+        map.put("workflowName", workflow.getName());
+        map.put("currentStageId", currentStage.getId());
+        map.put("currentStageName", currentStage.getName());
+        map.put("formData", tramite.getFormData());
+        map.put("createdAt", tramite.getCreatedAt());
+        map.put("updatedAt", tramite.getUpdatedAt());
+        map.put("history", history);
+        map.put("formDefinition", formDefinition);
+        map.put("availableTransitions", buildAvailableTransitions(currentStage, transitions));
+        map.put("incomingData", buildIncomingData(tramite, currentStage, transitions));
+        return map;
     }
 
     public Map<String, Object> createAndSubmit(Map<String, Object> body, String requestedById) {
@@ -488,66 +537,6 @@ public class TramiteService {
         historyRepo.save(history);
     }
 
-    private Map<String, Object> toActivitySummary(Tramite tramite, User actor,
-                                                   Map<String, Workflow> workflowMap, Map<String, WorkflowStage> stageMap) {
-        if (tramite.getStatus() == Tramite.Status.COMPLETADO || tramite.getStatus() == Tramite.Status.RECHAZADO) {
-            return null;
-        }
-        Workflow workflow = workflowMap.get(tramite.getWorkflowId());
-        if (workflow == null || !hasWorkflowAccess(actor, workflow)) return null;
-
-        WorkflowStage currentStage = tramite.getCurrentStageId() != null ? stageMap.get(tramite.getCurrentStageId()) : null;
-        if (currentStage == null || isPassThroughNode(currentStage) || !matchesStageResponsibility(currentStage, actor)) {
-            return null;
-        }
-
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", tramite.getId());
-        map.put("code", tramite.getCode());
-        map.put("title", tramite.getTitle());
-        map.put("status", tramite.getStatus());
-        map.put("workflowId", workflow.getId());
-        map.put("workflowName", workflow.getName());
-        map.put("currentStageId", currentStage.getId());
-        map.put("currentStageName", currentStage.getName());
-        map.put("createdAt", tramite.getCreatedAt());
-        map.put("updatedAt", tramite.getUpdatedAt());
-        return map;
-    }
-
-    private Map<String, Object> toActivityDetail(Tramite tramite, User actor) {
-        Workflow workflow = workflowRepo.findById(tramite.getWorkflowId()).orElse(null);
-        if (workflow == null || !hasWorkflowAccess(actor, workflow)) return null;
-
-        WorkflowStage currentStage = stageRepo.findById(tramite.getCurrentStageId()).orElse(null);
-        if (currentStage == null || isPassThroughNode(currentStage) || !matchesStageResponsibility(currentStage, actor)) {
-            return null;
-        }
-
-        List<HistorialTramite> history = historyRepo.findByTramiteIdOrderByChangedAtAsc(tramite.getId());
-        List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflow.getId());
-        FormDefinition formDefinition = formRepo.findByStageId(currentStage.getId()).orElse(null);
-
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", tramite.getId());
-        map.put("code", tramite.getCode());
-        map.put("title", tramite.getTitle());
-        map.put("description", tramite.getDescription());
-        map.put("status", tramite.getStatus());
-        map.put("workflowId", workflow.getId());
-        map.put("workflowName", workflow.getName());
-        map.put("currentStageId", currentStage.getId());
-        map.put("currentStageName", currentStage.getName());
-        map.put("formData", tramite.getFormData());
-        map.put("createdAt", tramite.getCreatedAt());
-        map.put("updatedAt", tramite.getUpdatedAt());
-        map.put("history", history);
-        map.put("formDefinition", formDefinition);
-        map.put("availableTransitions", buildAvailableTransitions(currentStage, transitions));
-        map.put("incomingData", buildIncomingData(tramite, currentStage, transitions));
-        return map;
-    }
-
     private List<Map<String, Object>> buildAvailableTransitions(WorkflowStage currentStage, List<WorkflowTransition> transitions) {
         List<Map<String, Object>> available = new ArrayList<>();
         for (WorkflowTransition transition : transitions) {
@@ -611,11 +600,10 @@ public class TramiteService {
         List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceStage, transitions, visitedStageIds);
         Map<String, Object> forwardConfig = transition.getForwardConfig();
         String mode = resolveForwardMode(forwardConfig);
-        boolean includeFiles = includeForwardFiles(forwardConfig);
         Set<String> selectedFieldNames = resolveSelectedFields(forwardConfig);
 
         return sourceFields.stream()
-                .filter(field -> shouldIncludeField(field, mode, selectedFieldNames, includeFiles))
+                .filter(field -> shouldIncludeField(field, mode, selectedFieldNames))
                 .map(field -> {
                     Object value = tramiteData.get(field.getName());
                     if (value == null || String.valueOf(value).isBlank()) return null;
@@ -652,16 +640,12 @@ public class TramiteService {
         List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceStage, transitions, visitedStageIds);
         Map<String, Object> forwardConfig = transition.getForwardConfig();
         return sourceFields.stream()
-                .filter(field -> shouldIncludeField(field, resolveForwardMode(forwardConfig), resolveSelectedFields(forwardConfig), includeForwardFiles(forwardConfig)))
+                .filter(field -> shouldIncludeField(field, resolveForwardMode(forwardConfig), resolveSelectedFields(forwardConfig)))
                 .toList();
     }
 
     private String resolveForwardMode(Map<String, Object> forwardConfig) {
-        return forwardConfig != null && forwardConfig.get("mode") != null ? String.valueOf(forwardConfig.get("mode")) : "all";
-    }
-
-    private boolean includeForwardFiles(Map<String, Object> forwardConfig) {
-        return forwardConfig != null && Boolean.TRUE.equals(forwardConfig.get("includeFiles"));
+        return forwardConfig != null && "selected".equals(String.valueOf(forwardConfig.get("mode"))) ? "selected" : "none";
     }
 
     private Set<String> resolveSelectedFields(Map<String, Object> forwardConfig) {
@@ -679,6 +663,35 @@ public class TramiteService {
             deduped.putIfAbsent(field.getName(), field);
         }
         return new ArrayList<>(deduped.values());
+    }
+
+    private boolean shouldIncludeField(FormDefinition.FormField field, String mode, Set<String> selectedFieldNames) {
+        if ("none".equalsIgnoreCase(mode)) return false;
+        return "selected".equalsIgnoreCase(mode) && selectedFieldNames.contains(field.getName());
+    }
+
+    private boolean hasWorkflowAccess(User actor, Workflow workflow) {
+        if (actor.getRole() == User.Role.SUPERADMIN) return true;
+        return actor.getCompanyId() != null && actor.getCompanyId().equals(workflow.getCompanyId());
+    }
+
+    private boolean matchesStageResponsibility(WorkflowStage stage, User actor) {
+        boolean hasJobRole = stage.getResponsibleJobRoleId() != null && !stage.getResponsibleJobRoleId().isBlank();
+        boolean hasDepartment = stage.getResponsibleDepartmentId() != null && !stage.getResponsibleDepartmentId().isBlank();
+        boolean hasRole = stage.getResponsibleRole() != null;
+
+        if (hasJobRole) {
+            boolean matchesJobRole = stage.getResponsibleJobRoleId().equals(actor.getJobRoleId());
+            if (!matchesJobRole) return false;
+            return !hasDepartment || (actor.getDepartmentId() != null && actor.getDepartmentId().equals(stage.getResponsibleDepartmentId()));
+        }
+        if (hasDepartment) {
+            return actor.getDepartmentId() != null && actor.getDepartmentId().equals(stage.getResponsibleDepartmentId());
+        }
+        if (hasRole) {
+            return actor.getRole() == stage.getResponsibleRole();
+        }
+        return false;
     }
 
     private void handleJoinSyncIfNeeded(Tramite tramite, WorkflowStage joinStage, String userId) {
@@ -751,38 +764,6 @@ public class TramiteService {
             if (name.equals("no") || name.equals("rechazado") || name.equals("rechazar")) return "reject";
         }
         return null;
-    }
-
-    private boolean shouldIncludeField(FormDefinition.FormField field, String mode, Set<String> selectedFieldNames, boolean includeFiles) {
-        if ("none".equalsIgnoreCase(mode)) return false;
-        boolean isFile = field.getType() == FormDefinition.FieldType.FILE;
-        if ("selected".equalsIgnoreCase(mode)) return selectedFieldNames.contains(field.getName()) || (includeFiles && isFile);
-        if ("files".equalsIgnoreCase(mode) || "files-only".equalsIgnoreCase(mode)) return isFile && includeFiles;
-        return !isFile || includeFiles;
-    }
-
-    private boolean hasWorkflowAccess(User actor, Workflow workflow) {
-        if (actor.getRole() == User.Role.SUPERADMIN) return true;
-        return actor.getCompanyId() != null && actor.getCompanyId().equals(workflow.getCompanyId());
-    }
-
-    private boolean matchesStageResponsibility(WorkflowStage stage, User actor) {
-        boolean hasJobRole = stage.getResponsibleJobRoleId() != null && !stage.getResponsibleJobRoleId().isBlank();
-        boolean hasDepartment = stage.getResponsibleDepartmentId() != null && !stage.getResponsibleDepartmentId().isBlank();
-        boolean hasRole = stage.getResponsibleRole() != null;
-
-        if (hasJobRole) {
-            boolean matchesJobRole = stage.getResponsibleJobRoleId().equals(actor.getJobRoleId());
-            if (!matchesJobRole) return false;
-            return !hasDepartment || (actor.getDepartmentId() != null && actor.getDepartmentId().equals(stage.getResponsibleDepartmentId()));
-        }
-        if (hasDepartment) {
-            return actor.getDepartmentId() != null && actor.getDepartmentId().equals(stage.getResponsibleDepartmentId());
-        }
-        if (hasRole) {
-            return actor.getRole() == stage.getResponsibleRole();
-        }
-        return false;
     }
 
 }

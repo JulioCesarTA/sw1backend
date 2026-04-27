@@ -22,11 +22,6 @@ public class DepartmentController {
         return ResponseEntity.ok(departmentService.findAll(companyId));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Department> findOne(@PathVariable String id) {
-        return ResponseEntity.ok(departmentService.findOne(id));
-    }
-
     @PostMapping
     public ResponseEntity<Department> create(@RequestBody Map<String, Object> body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(departmentService.create(body));
@@ -35,11 +30,5 @@ public class DepartmentController {
     @PatchMapping("/{id}")
     public ResponseEntity<Department> update(@PathVariable String id, @RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(departmentService.update(id, body));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> remove(@PathVariable String id) {
-        departmentService.remove(id);
-        return ResponseEntity.noContent().build();
     }
 }

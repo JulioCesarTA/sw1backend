@@ -23,11 +23,6 @@ public class UserController {
         return ResponseEntity.ok(userService.findAll(user));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<User> findOne(@PathVariable String id) {
-        return ResponseEntity.ok(userService.findOne(id));
-    }
-
     @PostMapping
     public ResponseEntity<User> create(@RequestBody Map<String, Object> body, @AuthenticationPrincipal User user) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.create(body, user));
@@ -36,11 +31,5 @@ public class UserController {
     @PatchMapping("/{id}")
     public ResponseEntity<User> update(@PathVariable String id, @RequestBody Map<String, Object> body, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(userService.update(id, body, user));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> remove(@PathVariable String id) {
-        userService.remove(id);
-        return ResponseEntity.noContent().build();
     }
 }

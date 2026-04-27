@@ -101,12 +101,6 @@ public class WorkflowService {
         return workflowRepo.save(workflow);
     }
 
-    public void remove(String id, User actor) {
-        Workflow workflow = findWorkflow(id);
-        validateWorkflowScope(actor, workflow);
-        workflowRepo.deleteById(id);
-    }
-
     public WorkflowStage createStage(Map<String, Object> body) {
         String workflowId = (String) body.get("workflowId");
         if (workflowId == null || workflowId.isBlank()) {
@@ -322,7 +316,17 @@ public class WorkflowService {
         if (body.containsKey("toStageId")) transition.setToStageId((String) body.get("toStageId"));
         if (body.containsKey("name")) transition.setName((String) body.getOrDefault("name", ""));
         if (body.containsKey("forwardConfig")) {
-            transition.setForwardConfig((Map<String, Object>) body.get("forwardConfig"));
+            Map<String, Object> raw = (Map<String, Object>) body.get("forwardConfig");
+            if (raw == null) {
+                transition.setForwardConfig(null);
+            } else {
+                String mode = "selected".equals(String.valueOf(raw.get("mode"))) ? "selected" : "none";
+                Object fieldNames = raw.get("fieldNames");
+                transition.setForwardConfig(Map.of(
+                        "mode", mode,
+                        "fieldNames", "selected".equals(mode) && fieldNames instanceof java.util.List<?> ? fieldNames : java.util.List.of()
+                ));
+            }
         }
     }
 

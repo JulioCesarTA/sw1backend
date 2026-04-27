@@ -20,11 +20,6 @@ public class CompanyService {
         return companyRepo.findAll();
     }
 
-    public Company findOne(String id) {
-        return companyRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada"));
-    }
-
     public Company create(Map<String, Object> body) {
         String name = (String) body.get("name");
         Company company = new Company();
@@ -33,13 +28,9 @@ public class CompanyService {
     }
 
     public Company update(String id, Map<String, Object> body) {
-        Company company = findOne(id);
+        Company company = companyRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada"));
         if (body.containsKey("name")) company.setName((String) body.get("name"));
         return companyRepo.save(company);
-    }
-
-    public void remove(String id) {
-        findOne(id);
-        companyRepo.deleteById(id);
     }
 }

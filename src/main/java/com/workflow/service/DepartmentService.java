@@ -26,11 +26,6 @@ public class DepartmentService {
         return departmentRepo.findAll();
     }
 
-    public Department findOne(String id) {
-        return departmentRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Departamento no encontrado"));
-    }
-
     public Department create(Map<String, Object> body) {
         String companyId = (String) body.get("companyId");
         Company company = companyRepo.findById(companyId)
@@ -42,7 +37,8 @@ public class DepartmentService {
     }
 
     public Department update(String id, Map<String, Object> body) {
-        Department department = findOne(id);
+        Department department = departmentRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Departamento no encontrado"));
         if (body.containsKey("companyId")) {
             String companyId = (String) body.get("companyId");
             companyRepo.findById(companyId)
@@ -51,10 +47,5 @@ public class DepartmentService {
         }
         if (body.containsKey("name")) department.setName((String) body.get("name"));
         return departmentRepo.save(department);
-    }
-
-    public void remove(String id) {
-        findOne(id);
-        departmentRepo.deleteById(id);
     }
 }

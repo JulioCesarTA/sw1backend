@@ -22,11 +22,6 @@ public class JobRoleController {
         return ResponseEntity.ok(jobRoleService.findAll(departmentId));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<JobRole> findOne(@PathVariable("id") String id) {
-        return ResponseEntity.ok(jobRoleService.findOne(id));
-    }
-
     @PostMapping
     public ResponseEntity<JobRole> create(@RequestBody Map<String, Object> body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(jobRoleService.create(body));
@@ -35,11 +30,5 @@ public class JobRoleController {
     @PatchMapping("/{id}")
     public ResponseEntity<JobRole> update(@PathVariable("id") String id, @RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(jobRoleService.update(id, body));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> remove(@PathVariable("id") String id) {
-        jobRoleService.remove(id);
-        return ResponseEntity.noContent().build();
     }
 }

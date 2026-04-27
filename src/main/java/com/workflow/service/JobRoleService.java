@@ -26,11 +26,6 @@ public class JobRoleService {
         return jobRoleRepository.findAll();
     }
 
-    public JobRole findOne(String id) {
-        return jobRoleRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rol no encontrado"));
-    }
-
     public JobRole create(Map<String, Object> body) {
         String departmentId = (String) body.get("departmentId");
         Department department = departmentRepository.findById(departmentId)
@@ -43,7 +38,8 @@ public class JobRoleService {
     }
 
     public JobRole update(String id, Map<String, Object> body) {
-        JobRole jobRole = findOne(id);
+        JobRole jobRole = jobRoleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rol no encontrado"));
         if (body.containsKey("departmentId")) {
             String departmentId = (String) body.get("departmentId");
             Department department = departmentRepository.findById(departmentId)
@@ -53,10 +49,5 @@ public class JobRoleService {
         }
         if (body.containsKey("name")) jobRole.setName((String) body.get("name"));
         return jobRoleRepository.save(jobRole);
-    }
-
-    public void remove(String id) {
-        findOne(id);
-        jobRoleRepository.deleteById(id);
     }
 }
