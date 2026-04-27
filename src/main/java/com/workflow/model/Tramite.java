@@ -1,5 +1,6 @@
 package com.workflow.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -13,8 +14,8 @@ import java.util.Map;
 
 @Data
 @NoArgsConstructor
-@Document(collection = "procedures")
-public class Procedure {
+@Document(collection = "tramites")
+public class Tramite {
 
     @Id
     private String id;
@@ -24,22 +25,13 @@ public class Procedure {
 
     private String title;
     private String description;
-    private String clientName;
-    private String documentNumber;
-    private String phone;
-    private String address;
-    private String requestType;
     private String workflowId;
-    private Status status = Status.PENDING;
+    private Status status = Status.PENDIENTE;
     private String currentStageId;
     private String requestedById;
     private String assignedUserId;
-    private String currentResponsibleId;
-    private Map<String, String> nextResponsibleMap;
     private Map<String, Object> formData;
-    private String parentProcedureId;
-    private Instant startedAt = Instant.now();
-    private Instant closedAt;
+    private String parentTramiteId;
 
     @CreatedDate
     private Instant createdAt;
@@ -48,6 +40,19 @@ public class Procedure {
     private Instant updatedAt;
 
     public enum Status {
-        PENDING, IN_PROGRESS, OBSERVED, APPROVED, REJECTED, COMPLETED
+        PENDIENTE, EN_PROGRESO, OBSERVADO, APROBADO, RECHAZADO, COMPLETADO;
+
+        @JsonCreator
+        public static Status fromJson(String value) {
+            if (value == null) return PENDIENTE;
+            return switch (value.toUpperCase()) {
+                case "EN_PROGRESO", "IN_PROGRESS" -> EN_PROGRESO;
+                case "OBSERVADO",   "OBSERVED"    -> OBSERVADO;
+                case "APROBADO",    "APPROVED"    -> APROBADO;
+                case "RECHAZADO",   "REJECTED"    -> RECHAZADO;
+                case "COMPLETADO",  "COMPLETED"   -> COMPLETADO;
+                default -> PENDIENTE;
+            };
+        }
     }
 }

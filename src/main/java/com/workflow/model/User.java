@@ -36,7 +36,7 @@ public class User {
 
     private String departmentId;
 
-    private String jobTitle;
+    private String jobRoleId;
 
     private String refreshTokenHash;
 

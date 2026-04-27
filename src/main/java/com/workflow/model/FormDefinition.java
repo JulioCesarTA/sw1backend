@@ -27,12 +27,11 @@ public class FormDefinition {
         private String id;
         private String name;
         private FieldType type;
-        private List<String> options;
         private boolean isRequired = false;
         private int order;
     }
 
     public enum FieldType {
-        TEXT, NUMBER, DATE,  FILE, EMAIL
+        TEXT, NUMBER, DATE, FILE, EMAIL
     }
 }

@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 
@@ -26,6 +27,7 @@ public class WorkflowAiProxyService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
+            .version(HttpClient.Version.HTTP_1_1)
             .build();
 
     public Map<String, Object> diagramCommand(Map<String, Object> body) {
@@ -42,12 +44,14 @@ public class WorkflowAiProxyService {
 
     private Map<String, Object> post(String path, Map<String, Object> body) {
         try {
+            String json = objectMapper.writeValueAsString(body);
             HttpResponse<String> response = httpClient.send(
                     HttpRequest.newBuilder()
                             .uri(URI.create(aiBaseUrl + path))
                             .timeout(Duration.ofSeconds(120))
                             .header("Content-Type", "application/json")
-                            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                            .header("Accept", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
                             .build(),
                     HttpResponse.BodyHandlers.ofString()
             );

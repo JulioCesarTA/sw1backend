@@ -2,13 +2,13 @@ package com.workflow.service;
 
 import com.workflow.model.Department;
 import com.workflow.model.JobRole;
-import com.workflow.model.Procedure;
-import com.workflow.model.ProcedureHistory;
+import com.workflow.model.Tramite;
+import com.workflow.model.HistorialTramite;
 import com.workflow.model.WorkflowStage;
-import com.workflow.repository.ProcedureRepository;
+import com.workflow.repository.TramiteRepository;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.JobRoleRepository;
-import com.workflow.repository.ProcedureHistoryRepository;
+import com.workflow.repository.HistorialTramiteRepository;
 import com.workflow.repository.WorkflowStageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,16 +25,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReportService {
 
-    private final ProcedureRepository procedureRepo;
-    private final ProcedureHistoryRepository procedureHistoryRepo;
+    private final TramiteRepository tramiteRepo;
+    private final HistorialTramiteRepository historialTramiteRepo;
     private final WorkflowStageRepository workflowStageRepo;
     private final DepartmentRepository departmentRepo;
     private final JobRoleRepository jobRoleRepo;
 
     public Map<String, Object> getDashboardStats() {
-        List<Procedure> procedures = procedureRepo.findAll();
-        List<ProcedureHistory> histories = procedureHistoryRepo.findByProcedureIdIn(procedures.stream().map(Procedure::getId).toList());
-        Set<String> stageIds = collectStageReferenceIds(histories.stream().map(ProcedureHistory::getToStageId).toList());
+        List<Tramite> tramites = tramiteRepo.findAll();
+        List<HistorialTramite> histories = historialTramiteRepo.findByTramiteIdIn(tramites.stream().map(Tramite::getId).toList());
+        Set<String> stageIds = collectStageReferenceIds(histories.stream().map(HistorialTramite::getToStageId).toList());
         Map<String, WorkflowStage> stagesById = workflowStageRepo.findAllById(stageIds).stream()
                 .collect(Collectors.toMap(WorkflowStage::getId, stage -> stage, (left, right) -> left));
         Set<String> departmentIds = collectStageReferenceIds(stagesById.values().stream().map(WorkflowStage::getResponsibleDepartmentId).toList());
@@ -43,12 +43,12 @@ public class ReportService {
                 .collect(Collectors.toMap(Department::getId, Department::getName));
         Map<String, String> jobRoleNames = jobRoleRepo.findAllById(jobRoleIds).stream()
                 .collect(Collectors.toMap(JobRole::getId, JobRole::getName));
-        Map<String, Long> byStatus = countByStatus(procedures);
+        Map<String, Long> byStatus = countByStatus(tramites);
 
         Map<String, RolePerformanceAccumulator> rolePerformance = new LinkedHashMap<>();
         Map<String, Long> departmentFlow = new LinkedHashMap<>();
 
-        for (ProcedureHistory history : histories) {
+        for (HistorialTramite history : histories) {
             String stageId = history.getToStageId();
             if (stageId == null || stageId.isBlank()) continue;
             WorkflowStage stage = stagesById.get(stageId);
@@ -73,8 +73,8 @@ public class ReportService {
                     new RolePerformanceAccumulator(departmentName, jobRoleName));
             acc.totalCompleted += 1;
             acc.totalDurationHours += durationInStage;
-            acc.totalSlaHours += stage.getSlaHours();
-            if (durationInStage <= stage.getSlaHours()) {
+            acc.totalAvgHours += stage.getAvgHours();
+            if (durationInStage <= stage.getAvgHours()) {
                 acc.finishedEarly += 1;
             } else {
                 acc.finishedLate += 1;
@@ -82,7 +82,7 @@ public class ReportService {
         }
 
         Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("totalProcedures", procedures.size());
+        stats.put("totalTramites", tramites.size());
         stats.put("byStatus", byStatus);
         stats.put("rolePerformance", rolePerformance.values().stream()
                 .sorted(Comparator
@@ -107,11 +107,14 @@ public class ReportService {
         return ids.stream().filter(id -> id != null && !id.isBlank()).collect(Collectors.toSet());
     }
 
-    private Map<String, Long> countByStatus(List<Procedure> procedures) {
-        Map<Procedure.Status, Long> counts = procedures.stream()
-                .collect(Collectors.groupingBy(Procedure::getStatus, () -> new EnumMap<>(Procedure.Status.class), Collectors.counting()));
+    private static final Set<Tramite.Status> VISIBLE_STATUSES = Set.of(
+            Tramite.Status.PENDIENTE, Tramite.Status.EN_PROGRESO, Tramite.Status.COMPLETADO);
+
+    private Map<String, Long> countByStatus(List<Tramite> tramites) {
+        Map<Tramite.Status, Long> counts = tramites.stream()
+                .collect(Collectors.groupingBy(Tramite::getStatus, () -> new EnumMap<>(Tramite.Status.class), Collectors.counting()));
         Map<String, Long> byStatus = new LinkedHashMap<>();
-        for (Procedure.Status status : Procedure.Status.values()) {
+        for (Tramite.Status status : VISIBLE_STATUSES) {
             byStatus.put(status.name(), counts.getOrDefault(status, 0L));
         }
         return byStatus;
@@ -124,7 +127,7 @@ public class ReportService {
         private int finishedLate = 0;
         private int totalCompleted = 0;
         private double totalDurationHours = 0D;
-        private double totalSlaHours = 0D;
+        private double totalAvgHours = 0D;
 
         private RolePerformanceAccumulator(String departmentName, String jobRoleName) {
             this.departmentName = departmentName;
@@ -151,7 +154,7 @@ public class ReportService {
             item.put("finishedLate", finishedLate);
             item.put("totalCompleted", totalCompleted);
             item.put("averageDurationHours", totalCompleted == 0 ? 0D : round(totalDurationHours / totalCompleted));
-            item.put("averageSlaHours", totalCompleted == 0 ? 0D : round(totalSlaHours / totalCompleted));
+            item.put("averageAvgHours", totalCompleted == 0 ? 0D : round(totalAvgHours / totalCompleted));
             return item;
         }
 

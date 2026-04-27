@@ -10,7 +10,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -37,22 +36,10 @@ public class WorkflowTransitionsController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @GetMapping
-    public ResponseEntity<List<WorkflowTransition>> findByWorkflow(@RequestParam String workflowId,
-                                                                   @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(workflowService.getTransitions(workflowId));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<WorkflowTransition> findOne(@PathVariable("id") String id,
-                                                      @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(workflowService.findTransition(id));
-    }
-
     @PatchMapping("/{id}")
     public ResponseEntity<WorkflowTransition> update(@PathVariable("id") String id, @RequestBody Map<String, Object> body,
                                                      @AuthenticationPrincipal User user) {
-        WorkflowTransition updated = workflowService.updateTransition(id, body, user);
+        WorkflowTransition updated = workflowService.updateTransition(id, body);
         messagingTemplate.convertAndSend(
                 "/topic/workflows/" + updated.getWorkflowId() + "/collab",
                 Map.of(

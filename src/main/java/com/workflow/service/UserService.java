@@ -45,10 +45,10 @@ public class UserService {
         user.setName((String) body.get("name"));
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode((String) body.get("password")));
-        user.setRole(User.Role.valueOf(((String) body.getOrDefault("role", "ATENCION_CLIENTE")).toUpperCase()));
+        user.setRole(User.Role.valueOf(((String) body.getOrDefault("role", "ADMIN")).toUpperCase()));
         user.setCompanyId(companyId);
         user.setDepartmentId((String) body.get("departmentId"));
-        user.setJobTitle((String) body.get("jobTitle"));
+        user.setJobRoleId((String) body.get("jobRoleId"));
         return userRepo.save(user);
     }
 
@@ -65,7 +65,7 @@ public class UserService {
         if (body.containsKey("role")) user.setRole(User.Role.valueOf(((String) body.get("role")).toUpperCase()));
         if (body.containsKey("companyId")) user.setCompanyId((String) body.get("companyId"));
         if (body.containsKey("departmentId")) user.setDepartmentId((String) body.get("departmentId"));
-        if (body.containsKey("jobTitle")) user.setJobTitle((String) body.get("jobTitle"));
+        if (body.containsKey("jobRoleId")) user.setJobRoleId((String) body.get("jobRoleId"));
         if (body.containsKey("password")) user.setPassword(passwordEncoder.encode((String) body.get("password")));
         return userRepo.save(user);
     }

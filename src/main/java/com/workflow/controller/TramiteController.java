@@ -1,8 +1,8 @@
 package com.workflow.controller;
 
-import com.workflow.model.Procedure;
+import com.workflow.model.Tramite;
 import com.workflow.model.User;
-import com.workflow.service.ProcedureService;
+import com.workflow.service.TramiteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,40 +13,40 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/procedures")
+@RequestMapping("/tramites")
 @RequiredArgsConstructor
-public class ProcedureController {
+public class TramiteController {
 
-    private final ProcedureService procedureService;
+    private final TramiteService tramiteService;
 
     @GetMapping
-    public ResponseEntity<List<Procedure>> findAll(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(procedureService.findAll(user));
+    public ResponseEntity<List<Tramite>> findAll(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(tramiteService.findAll(user));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> findOne(@PathVariable("id") String id) {
-        return ResponseEntity.ok(procedureService.findOne(id));
+        return ResponseEntity.ok(tramiteService.findOne(id));
     }
 
     @PostMapping("/submit")
     public ResponseEntity<Map<String, Object>> createAndSubmit(@RequestBody Map<String, Object> body,
                                                                @AuthenticationPrincipal User user) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(procedureService.createAndSubmit(body, user.getId()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(tramiteService.createAndSubmit(body, user.getId()));
     }
 
     @PostMapping("/{id}/advance")
     public ResponseEntity<Map<String, Object>> advance(@PathVariable("id") String id,
                                                         @RequestBody Map<String, Object> body,
                                                         @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(procedureService.advance(id, body, user.getId()));
+        return ResponseEntity.ok(tramiteService.advance(id, body, user.getId()));
     }
 
     @PostMapping("/{id}/reject")
-    public ResponseEntity<Procedure> reject(@PathVariable("id") String id,
+    public ResponseEntity<Tramite> reject(@PathVariable("id") String id,
                                              @RequestBody Map<String, Object> body,
                                              @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(procedureService.reject(id, body, user.getId()));
+        return ResponseEntity.ok(tramiteService.reject(id, body, user.getId()));
     }
 
 

@@ -3,8 +3,8 @@ package com.workflow.service;
 import com.workflow.model.Department;
 import com.workflow.model.FormDefinition;
 import com.workflow.model.JobRole;
-import com.workflow.model.Procedure;
-import com.workflow.model.ProcedureHistory;
+import com.workflow.model.Tramite;
+import com.workflow.model.HistorialTramite;
 import com.workflow.model.User;
 import com.workflow.model.Workflow;
 import com.workflow.model.WorkflowStage;
@@ -12,8 +12,8 @@ import com.workflow.model.WorkflowTransition;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.FormDefinitionRepository;
 import com.workflow.repository.JobRoleRepository;
-import com.workflow.repository.ProcedureHistoryRepository;
-import com.workflow.repository.ProcedureRepository;
+import com.workflow.repository.HistorialTramiteRepository;
+import com.workflow.repository.TramiteRepository;
 import com.workflow.repository.UserRepository;
 import com.workflow.repository.WorkflowRepository;
 import com.workflow.repository.WorkflowStageRepository;
@@ -34,10 +34,10 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class ProcedureService {
+public class TramiteService {
 
-    private final ProcedureRepository procedureRepo;
-    private final ProcedureHistoryRepository historyRepo;
+    private final TramiteRepository tramiteRepo;
+    private final HistorialTramiteRepository historyRepo;
     private final WorkflowRepository workflowRepo;
     private final WorkflowStageRepository stageRepo;
     private final WorkflowTransitionRepository transitionRepo;
@@ -48,52 +48,52 @@ public class ProcedureService {
     private final FcmService fcmService;
     private final ReportRealtimeService reportRealtimeService;
 
-    public List<Procedure> findAll(User user) {
+    public List<Tramite> findAll(User user) {
         if (user.getRole() == User.Role.ADMIN || user.getRole() == User.Role.SUPERADMIN) {
-            return procedureRepo.findAll();
+            return tramiteRepo.findAll();
         }
         if (user.getRole() == User.Role.CLIENTE) {
             String email = user.getEmail();
             if (email == null || email.isBlank()) return List.of();
-            return procedureRepo.findAll().stream()
+            return tramiteRepo.findAll().stream()
                     .filter(p -> p.getFormData() != null &&
                             p.getFormData().values().stream()
                                     .anyMatch(v -> email.equalsIgnoreCase(v != null ? v.toString() : null)))
                     .toList();
         }
-        return procedureRepo.findByAssignedUserIdOrRequestedById(user.getId(), user.getId());
+        return tramiteRepo.findByAssignedUserIdOrRequestedById(user.getId(), user.getId());
     }
 
     public Map<String, Object> findOne(String id) {
-        Procedure procedure = procedureRepo.findById(id)
+        Tramite tramite = tramiteRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tramite no encontrado"));
-        List<ProcedureHistory> history = historyRepo.findByProcedureIdOrderByChangedAtAsc(procedure.getId());
+        List<HistorialTramite> history = historyRepo.findByTramiteIdOrderByChangedAtAsc(tramite.getId());
 
-        boolean isActive = procedure.getStatus() != Procedure.Status.COMPLETED
-                && procedure.getStatus() != Procedure.Status.REJECTED;
-        List<Procedure> activeClones = procedure.getParentProcedureId() == null && isActive
-                ? procedureRepo.findByParentProcedureId(procedure.getId()).stream()
-                        .filter(c -> c.getStatus() != Procedure.Status.COMPLETED
-                                && c.getStatus() != Procedure.Status.REJECTED
+        boolean isActive = tramite.getStatus() != Tramite.Status.COMPLETADO
+                && tramite.getStatus() != Tramite.Status.RECHAZADO;
+        List<Tramite> activeClones = tramite.getParentTramiteId() == null && isActive
+                ? tramiteRepo.findByParentTramiteId(tramite.getId()).stream()
+                        .filter(c -> c.getStatus() != Tramite.Status.COMPLETADO
+                                && c.getStatus() != Tramite.Status.RECHAZADO
                                 && c.getCurrentStageId() != null)
                         .collect(Collectors.toList())
                 : List.of();
 
         Set<String> activeStageIds = new java.util.HashSet<>();
-        WorkflowStage rootCurrentStage = isActive && procedure.getCurrentStageId() != null
-                ? stageRepo.findById(procedure.getCurrentStageId()).orElse(null)
+        WorkflowStage rootCurrentStage = isActive && tramite.getCurrentStageId() != null
+                ? stageRepo.findById(tramite.getCurrentStageId()).orElse(null)
                 : null;
         boolean rootIsWaitingOnPassThrough = rootCurrentStage != null
                 && isPassThroughNode(rootCurrentStage)
                 && !activeClones.isEmpty();
-        if (isActive && procedure.getCurrentStageId() != null && !rootIsWaitingOnPassThrough) {
-            activeStageIds.add(procedure.getCurrentStageId());
+        if (isActive && tramite.getCurrentStageId() != null && !rootIsWaitingOnPassThrough) {
+            activeStageIds.add(tramite.getCurrentStageId());
         }
         activeClones.forEach(c -> activeStageIds.add(c.getCurrentStageId()));
 
         Set<String> allStageIds = history.stream()
                 .filter(h -> h.getToStageId() != null)
-                .map(ProcedureHistory::getToStageId)
+                .map(HistorialTramite::getToStageId)
                 .collect(Collectors.toSet());
         allStageIds.addAll(activeStageIds);
         Map<String, WorkflowStage> stageMap = stageRepo.findAllById(allStageIds).stream()
@@ -116,7 +116,7 @@ public class ProcedureService {
         Set<String> currentHistoryIds = new LinkedHashSet<>();
         Set<String> pendingActiveStageIds = new LinkedHashSet<>(activeStageIds);
         for (int index = history.size() - 1; index >= 0; index--) {
-            ProcedureHistory historyEntry = history.get(index);
+            HistorialTramite historyEntry = history.get(index);
             String stageId = historyEntry.getToStageId();
             if (stageId != null && pendingActiveStageIds.remove(stageId)) {
                 currentHistoryIds.add(historyEntry.getId());
@@ -126,10 +126,10 @@ public class ProcedureService {
 
         Set<String> coveredStageIds = new java.util.HashSet<>();
         List<Map<String, Object>> enrichedHistory = new ArrayList<>();
-        for (ProcedureHistory h : history) {
+        for (HistorialTramite h : history) {
             WorkflowStage stage = h.getToStageId() != null ? stageMap.get(h.getToStageId()) : null;
             if (stage != null && isPassThroughNode(stage)
-                    && ("ADVANCED".equals(h.getAction()) || "JOIN_ADVANCED".equals(h.getAction()))) {
+                    && ("AVANZADO".equals(h.getAction()) || "UNION_COMPLETADA".equals(h.getAction()))) {
                 continue;
             }
             if (h.getToStageId() != null) coveredStageIds.add(h.getToStageId());
@@ -150,13 +150,13 @@ public class ProcedureService {
             enrichedHistory.add(entry);
         }
 
-        for (Procedure clone : activeClones) {
+        for (Tramite clone : activeClones) {
             String cloneStageId = clone.getCurrentStageId();
             if (coveredStageIds.contains(cloneStageId)) continue;
             WorkflowStage stage = stageMap.get(cloneStageId);
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("id", "branch-" + clone.getId());
-            entry.put("action", "ADVANCED");
+            entry.put("action", "AVANZADO");
             entry.put("fromStageId", null);
             entry.put("toStageId", cloneStageId);
             entry.put("comment", "Rama paralela en curso");
@@ -173,43 +173,43 @@ public class ProcedureService {
         }
 
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", procedure.getId());
-        map.put("code", procedure.getCode());
-        map.put("title", procedure.getTitle());
-        map.put("description", procedure.getDescription());
-        map.put("status", procedure.getStatus());
-        map.put("workflowId", procedure.getWorkflowId());
-        map.put("currentStageId", procedure.getCurrentStageId());
-        map.put("requestedById", procedure.getRequestedById());
-        map.put("assignedUserId", procedure.getAssignedUserId());
-        map.put("formData", procedure.getFormData());
-        map.put("createdAt", procedure.getCreatedAt());
-        map.put("updatedAt", procedure.getUpdatedAt());
+        map.put("id", tramite.getId());
+        map.put("code", tramite.getCode());
+        map.put("title", tramite.getTitle());
+        map.put("description", tramite.getDescription());
+        map.put("status", tramite.getStatus());
+        map.put("workflowId", tramite.getWorkflowId());
+        map.put("currentStageId", tramite.getCurrentStageId());
+        map.put("requestedById", tramite.getRequestedById());
+        map.put("assignedUserId", tramite.getAssignedUserId());
+        map.put("formData", tramite.getFormData());
+        map.put("createdAt", tramite.getCreatedAt());
+        map.put("updatedAt", tramite.getUpdatedAt());
         map.put("history", enrichedHistory);
         return map;
     }
 
     public List<Map<String, Object>> listActivities(User actor) {
-        List<Procedure> procedures = procedureRepo.findAll();
+        List<Tramite> tramites = tramiteRepo.findAll();
 
-        Set<String> workflowIds = procedures.stream().map(Procedure::getWorkflowId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<String> workflowIds = tramites.stream().map(Tramite::getWorkflowId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<String, Workflow> workflowMap = workflowRepo.findAllById(workflowIds).stream()
                 .collect(Collectors.toMap(Workflow::getId, w -> w));
 
-        Set<String> stageIds = procedures.stream().map(Procedure::getCurrentStageId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<String> stageIds = tramites.stream().map(Tramite::getCurrentStageId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<String, WorkflowStage> stageMap = stageRepo.findAllById(stageIds).stream()
                 .collect(Collectors.toMap(WorkflowStage::getId, s -> s));
 
-        return procedures.stream()
+        return tramites.stream()
                 .map(p -> toActivitySummary(p, actor, workflowMap, stageMap))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
     public Map<String, Object> findActivity(String id, User actor) {
-        Procedure procedure = procedureRepo.findById(id)
+        Tramite tramite = tramiteRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Actividad no encontrada"));
-        Map<String, Object> detail = toActivityDetail(procedure, actor);
+        Map<String, Object> detail = toActivityDetail(tramite, actor);
         if (detail == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta actividad");
         }
@@ -217,7 +217,7 @@ public class ProcedureService {
     }
 
     public Map<String, Object> createAndSubmit(Map<String, Object> body, String requestedById) {
-        Procedure created = createInternal(body, requestedById);
+        Tramite created = createInternal(body, requestedById);
         @SuppressWarnings("unchecked")
         List<String> autoTransitionIds = (List<String>) body.getOrDefault("autoTransitionIds", List.of());
 
@@ -242,7 +242,7 @@ public class ProcedureService {
         return latest != null ? latest : findOne(created.getId());
     }
 
-    private Procedure createInternal(Map<String, Object> body, String requestedById) {
+    private Tramite createInternal(Map<String, Object> body, String requestedById) {
         Workflow workflow = workflowRepo.findById((String) body.get("workflowId"))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Workflow no encontrado"));
 
@@ -250,22 +250,26 @@ public class ProcedureService {
         if (stages.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El workflow no tiene etapas");
         }
+        WorkflowStage initialStage = stages.stream()
+                .filter(stage -> "start".equalsIgnoreCase(stage.getNodeType()))
+                .findFirst()
+                .orElse(stages.get(0));
 
-        Procedure procedure = new Procedure();
-        procedure.setCode(generateCode());
-        procedure.setTitle((String) body.get("title"));
-        procedure.setDescription((String) body.get("description"));
-        procedure.setWorkflowId(workflow.getId());
-        procedure.setCurrentStageId(stages.get(0).getId());
-        procedure.setRequestedById(requestedById);
-        procedure.setStatus(Procedure.Status.PENDING);
+        Tramite tramite = new Tramite();
+        tramite.setCode(generateCode());
+        tramite.setTitle((String) body.get("title"));
+        tramite.setDescription((String) body.get("description"));
+        tramite.setWorkflowId(workflow.getId());
+        tramite.setCurrentStageId(initialStage.getId());
+        tramite.setRequestedById(requestedById);
+        tramite.setStatus(Tramite.Status.PENDIENTE);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> formData = (Map<String, Object>) body.getOrDefault("formData", new LinkedHashMap<>());
-        procedure.setFormData(new LinkedHashMap<>(formData));
+        tramite.setFormData(new LinkedHashMap<>(formData));
 
-        Procedure saved = procedureRepo.save(procedure);
-        recordHistory(saved.getId(), null, stages.get(0).getId(), "CREATED", requestedById, "Tramite creado");
+        Tramite saved = tramiteRepo.save(tramite);
+        recordHistory(saved.getId(), null, initialStage.getId(), "CREADO", requestedById, "Tramite creado");
         return saved;
     }
 
@@ -274,25 +278,25 @@ public class ProcedureService {
     }
 
     private Map<String, Object> advanceInternal(String id, Map<String, Object> body, String userId, boolean publishReports) {
-        Procedure procedure = procedureRepo.findById(id)
+        Tramite tramite = tramiteRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tramite no encontrado"));
 
         String transitionId = (String) body.get("transitionId");
         String[] transitionPath = transitionId == null ? new String[0] : transitionId.split(">>");
         WorkflowTransition transition = transitionRepo.findById(transitionPath.length > 0 ? transitionPath[0] : transitionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transicion no encontrada"));
-        List<WorkflowTransition> workflowTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(procedure.getWorkflowId());
+        List<WorkflowTransition> workflowTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(tramite.getWorkflowId());
 
-        if (!transition.getFromStageId().equals(procedure.getCurrentStageId())) {
+        if (!transition.getFromStageId().equals(tramite.getCurrentStageId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transicion invalida para la etapa actual");
         }
 
-        String previousStageId = procedure.getCurrentStageId();
+        String previousStageId = tramite.getCurrentStageId();
         WorkflowTransition finalTransition = transition;
         WorkflowStage passThroughStage = stageRepo.findById(transition.getToStageId()).orElse(null);
         WorkflowStage toStage = passThroughStage;
-        String forkPassthroughId = null;
-        String transitionHistoryAction = "ADVANCED";
+        String bifurcasionPassthroughId = null;
+        String transitionHistoryAction = "AVANZADO";
         int transitionPathIndex = 1;
         while (toStage != null) {
             if (hasNodeType(toStage, "decision", "loop")) {
@@ -310,16 +314,16 @@ public class ProcedureService {
                     transitionHistoryAction = resolveLoopHistoryAction(finalTransition);
                 } else if (hasNodeType(passThroughStage, "decision")
                         && "reject".equals(resolveBranchOutcome(passThroughStage, finalTransition))) {
-                    transitionHistoryAction = "DECISION_REJECTED";
+                    transitionHistoryAction = "DECISION_RECHAZADA";
                 }
                 toStage = stageRepo.findById(finalTransition.getToStageId()).orElse(null);
                 continue;
             }
-            if (hasNodeType(toStage, "fork")) {
-                forkPassthroughId = toStage.getId();
-                final String forkId = toStage.getId();
+            if (hasNodeType(toStage, "bifurcasion")) {
+                bifurcasionPassthroughId = toStage.getId();
+                final String bifurcasionId = toStage.getId();
                 WorkflowTransition firstBranch = workflowTransitions.stream()
-                    .filter(t -> forkId.equals(t.getFromStageId()))
+                    .filter(t -> bifurcasionId.equals(t.getFromStageId()))
                     .findFirst().orElse(null);
                 if (firstBranch == null) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La bifurcacion no tiene ramas configuradas");
@@ -331,36 +335,48 @@ public class ProcedureService {
             break;
         }
 
-        procedure.setCurrentStageId(finalTransition.getToStageId());
+        tramite.setCurrentStageId(finalTransition.getToStageId());
         boolean isFinal = toStage != null && "END".equalsIgnoreCase(toStage.getNodeType());
-        procedure.setStatus(isFinal ? Procedure.Status.COMPLETED : Procedure.Status.IN_PROGRESS);
+        tramite.setStatus(isFinal ? Tramite.Status.COMPLETADO : Tramite.Status.EN_PROGRESO);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> formData = (Map<String, Object>) body.get("formData");
         if (formData != null) {
             Map<String, Object> merged = new LinkedHashMap<>();
-            if (procedure.getFormData() != null) merged.putAll(procedure.getFormData());
+            if (tramite.getFormData() != null) merged.putAll(tramite.getFormData());
             merged.putAll(formData);
-            procedure.setFormData(merged);
+            tramite.setFormData(merged);
         }
 
         String comment = (String) body.getOrDefault("comment", "");
-        Procedure saved = procedureRepo.save(procedure);
-        recordHistory(
-                saved.getId(),
-                passThroughStage != null && isPassThroughNode(passThroughStage) ? passThroughStage.getId() : previousStageId,
-                finalTransition.getToStageId(),
-                transitionHistoryAction,
-                userId,
-                comment
-        );
+        Tramite saved = tramiteRepo.save(tramite);
+        String resolvedFromStageId = passThroughStage != null && isPassThroughNode(passThroughStage)
+                ? passThroughStage.getId()
+                : previousStageId;
+        boolean recordsEvaluationAndAdvance = "DECISION_RECHAZADA".equals(transitionHistoryAction)
+                || "LOOP_RECHAZADO".equals(transitionHistoryAction)
+                || "LOOP_APROBADO".equals(transitionHistoryAction)
+                || "LOOP_EVALUADO".equals(transitionHistoryAction);
+        if (recordsEvaluationAndAdvance) {
+            recordHistory(saved.getId(), previousStageId, previousStageId, transitionHistoryAction, userId, comment);
+            recordHistory(saved.getId(), resolvedFromStageId, finalTransition.getToStageId(), "AVANZADO", userId, comment);
+        } else {
+            recordHistory(
+                    saved.getId(),
+                    resolvedFromStageId,
+                    finalTransition.getToStageId(),
+                    transitionHistoryAction,
+                    userId,
+                    comment
+            );
+        }
         if (isFinal) {
             sendStatusNotification(saved, "Trámite completado",
                     "Tu trámite " + saved.getCode() + " ha sido completado exitosamente.");
         }
 
-        String fromStageForFork = forkPassthroughId != null ? forkPassthroughId : previousStageId;
-        handleForkSplitIfNeeded(saved, fromStageForFork, finalTransition.getId(), userId);
+        String fromStageForBifurcasion = bifurcasionPassthroughId != null ? bifurcasionPassthroughId : previousStageId;
+        handleBifurcasionSplitIfNeeded(saved, fromStageForBifurcasion, finalTransition.getId(), userId);
 
         if (hasNodeType(toStage, "join")) {
             handleJoinSyncIfNeeded(saved, toStage, userId);
@@ -369,57 +385,57 @@ public class ProcedureService {
         if (publishReports) {
             reportRealtimeService.scheduleDashboardUpdate();
         }
-        String responseProcedureId = saved.getId();
-        if (saved.getParentProcedureId() != null && !procedureRepo.existsById(saved.getId())) {
-            responseProcedureId = saved.getParentProcedureId();
+        String responseTramiteId = saved.getId();
+        if (saved.getParentTramiteId() != null && !tramiteRepo.existsById(saved.getId())) {
+            responseTramiteId = saved.getParentTramiteId();
         }
-        return findOne(responseProcedureId);
+        return findOne(responseTramiteId);
     }
 
-    private void handleForkSplitIfNeeded(Procedure procedure, String fromStageId, String usedTransitionId, String userId) {
+    private void handleBifurcasionSplitIfNeeded(Tramite tramite, String fromStageId, String usedTransitionId, String userId) {
         WorkflowStage fromStage = stageRepo.findById(fromStageId).orElse(null);
-        if (fromStage == null || !hasNodeType(fromStage, "fork")) return;
+        if (fromStage == null || !hasNodeType(fromStage, "bifurcasion")) return;
 
-        List<WorkflowTransition> allTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(procedure.getWorkflowId());
+        List<WorkflowTransition> allTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(tramite.getWorkflowId());
         List<WorkflowTransition> otherBranches = allTransitions.stream()
                 .filter(t -> fromStageId.equals(t.getFromStageId()) && !usedTransitionId.equals(t.getId()))
                 .toList();
 
         for (WorkflowTransition branch : otherBranches) {
-            Procedure clone = new Procedure();
+            Tramite clone = new Tramite();
             clone.setCode(generateCode());
-            clone.setTitle(procedure.getTitle());
-            clone.setDescription(procedure.getDescription());
-            clone.setWorkflowId(procedure.getWorkflowId());
+            clone.setTitle(tramite.getTitle());
+            clone.setDescription(tramite.getDescription());
+            clone.setWorkflowId(tramite.getWorkflowId());
             clone.setCurrentStageId(branch.getToStageId());
-            clone.setRequestedById(procedure.getRequestedById());
-            clone.setAssignedUserId(procedure.getAssignedUserId());
-            clone.setStatus(Procedure.Status.IN_PROGRESS);
-            String rootId = procedure.getParentProcedureId() != null ? procedure.getParentProcedureId() : procedure.getId();
-            clone.setParentProcedureId(rootId);
-            if (procedure.getFormData() != null) clone.setFormData(new LinkedHashMap<>(procedure.getFormData()));
+            clone.setRequestedById(tramite.getRequestedById());
+            clone.setAssignedUserId(tramite.getAssignedUserId());
+            clone.setStatus(Tramite.Status.EN_PROGRESO);
+            String rootId = tramite.getParentTramiteId() != null ? tramite.getParentTramiteId() : tramite.getId();
+            clone.setParentTramiteId(rootId);
+            if (tramite.getFormData() != null) clone.setFormData(new LinkedHashMap<>(tramite.getFormData()));
 
-            Procedure savedClone = procedureRepo.save(clone);
+            Tramite savedClone = tramiteRepo.save(clone);
             recordHistory(savedClone.getId(), fromStageId, branch.getToStageId(),
-                    "FORK_BRANCH", userId, "Rama creada por bifurcacion desde " + fromStage.getName());
-            recordHistory(rootId, fromStageId, branch.getToStageId(), "ADVANCED", userId, "Rama paralela en curso");
+                    "BIFURCACION", userId, "Rama creada por bifurcacion desde " + fromStage.getName());
+            recordHistory(rootId, fromStageId, branch.getToStageId(), "AVANZADO", userId, "Rama paralela en curso");
         }
     }
 
-    public Procedure reject(String id, Map<String, Object> body, String userId) {
-        Procedure procedure = procedureRepo.findById(id)
+    public Tramite reject(String id, Map<String, Object> body, String userId) {
+        Tramite tramite = tramiteRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tramite no encontrado"));
-        procedure.setStatus(Procedure.Status.REJECTED);
-        Procedure saved = procedureRepo.save(procedure);
+        tramite.setStatus(Tramite.Status.RECHAZADO);
+        Tramite saved = tramiteRepo.save(tramite);
         String reason = (String) body.getOrDefault("reason", "Rechazado");
-        recordHistory(saved.getId(), procedure.getCurrentStageId(), null, "REJECTED", userId, reason);
+        recordHistory(saved.getId(), tramite.getCurrentStageId(), null, "RECHAZADO", userId, reason);
         sendStatusNotification(saved, "Trámite rechazado", "Tu trámite " + saved.getCode() + " ha sido rechazado.");
         reportRealtimeService.scheduleDashboardUpdate();
         return saved;
     }
 
-    private void sendStatusNotification(Procedure procedure, String title, String body) {
-        String email = findEMAILEmailFromProcedure(procedure);
+    private void sendStatusNotification(Tramite tramite, String title, String body) {
+        String email = findEmailFromTramite(tramite);
         if (email == null || email.isBlank()) return;
         userRepository.findByEmail(email).ifPresent(user -> {
             if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
@@ -428,15 +444,15 @@ public class ProcedureService {
         });
     }
 
-    private String findEMAILEmailFromProcedure(Procedure procedure) {
-        List<WorkflowStage> stages = stageRepo.findByWorkflowIdOrderByOrderAsc(procedure.getWorkflowId());
+    private String findEmailFromTramite(Tramite tramite) {
+        List<WorkflowStage> stages = stageRepo.findByWorkflowIdOrderByOrderAsc(tramite.getWorkflowId());
         WorkflowStage startStage = stages.stream()
                 .filter(s -> "start".equalsIgnoreCase(s.getNodeType()))
                 .findFirst()
                 .orElse(stages.isEmpty() ? null : stages.get(0));
         if (startStage == null) return null;
 
-        List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(procedure.getWorkflowId());
+        List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(tramite.getWorkflowId());
         WorkflowTransition fromStart = transitions.stream()
                 .filter(t -> startStage.getId().equals(t.getFromStageId()))
                 .findFirst().orElse(null);
@@ -445,25 +461,25 @@ public class ProcedureService {
         FormDefinition form = formRepo.findByStageId(fromStart.getToStageId()).orElse(null);
         if (form == null || form.getFields() == null) return null;
 
-        FormDefinition.FormField EMAILField = form.getFields().stream()
+        FormDefinition.FormField emailField = form.getFields().stream()
                 .filter(f -> FormDefinition.FieldType.EMAIL.equals(f.getType()))
                 .findFirst().orElse(null);
-        if (EMAILField == null) return null;
+        if (emailField == null) return null;
 
-        if (procedure.getFormData() == null) return null;
-        Object emailValue = procedure.getFormData().get(EMAILField.getName());
+        if (tramite.getFormData() == null) return null;
+        Object emailValue = tramite.getFormData().get(emailField.getName());
         return emailValue != null ? emailValue.toString() : null;
     }
 
     private String generateCode() {
-        long count = procedureRepo.count() + 1;
+        long count = tramiteRepo.count() + 1;
         return "TRM" + String.format("%05d", count);
     }
 
-    private void recordHistory(String procedureId, String fromStageId, String toStageId,
+    private void recordHistory(String tramiteId, String fromStageId, String toStageId,
                                String action, String changedById, String comment) {
-        ProcedureHistory history = new ProcedureHistory();
-        history.setProcedureId(procedureId);
+        HistorialTramite history = new HistorialTramite();
+        history.setTramiteId(tramiteId);
         history.setFromStageId(fromStageId);
         history.setToStageId(toStageId);
         history.setAction(action);
@@ -472,63 +488,63 @@ public class ProcedureService {
         historyRepo.save(history);
     }
 
-    private Map<String, Object> toActivitySummary(Procedure procedure, User actor,
+    private Map<String, Object> toActivitySummary(Tramite tramite, User actor,
                                                    Map<String, Workflow> workflowMap, Map<String, WorkflowStage> stageMap) {
-        if (procedure.getStatus() == Procedure.Status.COMPLETED || procedure.getStatus() == Procedure.Status.REJECTED) {
+        if (tramite.getStatus() == Tramite.Status.COMPLETADO || tramite.getStatus() == Tramite.Status.RECHAZADO) {
             return null;
         }
-        Workflow workflow = workflowMap.get(procedure.getWorkflowId());
+        Workflow workflow = workflowMap.get(tramite.getWorkflowId());
         if (workflow == null || !hasWorkflowAccess(actor, workflow)) return null;
 
-        WorkflowStage currentStage = procedure.getCurrentStageId() != null ? stageMap.get(procedure.getCurrentStageId()) : null;
+        WorkflowStage currentStage = tramite.getCurrentStageId() != null ? stageMap.get(tramite.getCurrentStageId()) : null;
         if (currentStage == null || isPassThroughNode(currentStage) || !matchesStageResponsibility(currentStage, actor)) {
             return null;
         }
 
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", procedure.getId());
-        map.put("code", procedure.getCode());
-        map.put("title", procedure.getTitle());
-        map.put("status", procedure.getStatus());
+        map.put("id", tramite.getId());
+        map.put("code", tramite.getCode());
+        map.put("title", tramite.getTitle());
+        map.put("status", tramite.getStatus());
         map.put("workflowId", workflow.getId());
         map.put("workflowName", workflow.getName());
         map.put("currentStageId", currentStage.getId());
         map.put("currentStageName", currentStage.getName());
-        map.put("createdAt", procedure.getCreatedAt());
-        map.put("updatedAt", procedure.getUpdatedAt());
+        map.put("createdAt", tramite.getCreatedAt());
+        map.put("updatedAt", tramite.getUpdatedAt());
         return map;
     }
 
-    private Map<String, Object> toActivityDetail(Procedure procedure, User actor) {
-        Workflow workflow = workflowRepo.findById(procedure.getWorkflowId()).orElse(null);
+    private Map<String, Object> toActivityDetail(Tramite tramite, User actor) {
+        Workflow workflow = workflowRepo.findById(tramite.getWorkflowId()).orElse(null);
         if (workflow == null || !hasWorkflowAccess(actor, workflow)) return null;
 
-        WorkflowStage currentStage = stageRepo.findById(procedure.getCurrentStageId()).orElse(null);
+        WorkflowStage currentStage = stageRepo.findById(tramite.getCurrentStageId()).orElse(null);
         if (currentStage == null || isPassThroughNode(currentStage) || !matchesStageResponsibility(currentStage, actor)) {
             return null;
         }
 
-        List<ProcedureHistory> history = historyRepo.findByProcedureIdOrderByChangedAtAsc(procedure.getId());
+        List<HistorialTramite> history = historyRepo.findByTramiteIdOrderByChangedAtAsc(tramite.getId());
         List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflow.getId());
         FormDefinition formDefinition = formRepo.findByStageId(currentStage.getId()).orElse(null);
 
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", procedure.getId());
-        map.put("code", procedure.getCode());
-        map.put("title", procedure.getTitle());
-        map.put("description", procedure.getDescription());
-        map.put("status", procedure.getStatus());
+        map.put("id", tramite.getId());
+        map.put("code", tramite.getCode());
+        map.put("title", tramite.getTitle());
+        map.put("description", tramite.getDescription());
+        map.put("status", tramite.getStatus());
         map.put("workflowId", workflow.getId());
         map.put("workflowName", workflow.getName());
         map.put("currentStageId", currentStage.getId());
         map.put("currentStageName", currentStage.getName());
-        map.put("formData", procedure.getFormData());
-        map.put("createdAt", procedure.getCreatedAt());
-        map.put("updatedAt", procedure.getUpdatedAt());
+        map.put("formData", tramite.getFormData());
+        map.put("createdAt", tramite.getCreatedAt());
+        map.put("updatedAt", tramite.getUpdatedAt());
         map.put("history", history);
         map.put("formDefinition", formDefinition);
         map.put("availableTransitions", buildAvailableTransitions(currentStage, transitions));
-        map.put("incomingData", buildIncomingData(procedure, currentStage, transitions));
+        map.put("incomingData", buildIncomingData(tramite, currentStage, transitions));
         return map;
     }
 
@@ -570,14 +586,14 @@ public class ProcedureService {
         return available;
     }
 
-    private List<Map<String, Object>> buildIncomingData(Procedure procedure, WorkflowStage currentStage, List<WorkflowTransition> transitions) {
-        Map<String, Object> procedureData = procedure.getFormData() == null ? Map.of() : procedure.getFormData();
+    private List<Map<String, Object>> buildIncomingData(Tramite tramite, WorkflowStage currentStage, List<WorkflowTransition> transitions) {
+        Map<String, Object> tramiteData = tramite.getFormData() == null ? Map.of() : tramite.getFormData();
         List<Map<String, Object>> incomingData = new ArrayList<>();
         for (WorkflowTransition transition : transitions) {
             if (!currentStage.getId().equals(transition.getToStageId())) continue;
             WorkflowStage sourceStage = stageRepo.findById(transition.getFromStageId()).orElse(null);
             if (sourceStage == null) continue;
-            List<Map<String, Object>> fields = buildSharedFields(sourceStage, transition, procedureData, transitions, new LinkedHashSet<>());
+            List<Map<String, Object>> fields = buildSharedFields(sourceStage, transition, tramiteData, transitions, new LinkedHashSet<>());
             if (fields.isEmpty()) continue;
             Map<String, Object> incoming = new LinkedHashMap<>();
             incoming.put("transitionId", transition.getId());
@@ -590,7 +606,7 @@ public class ProcedureService {
     }
 
     private List<Map<String, Object>> buildSharedFields(WorkflowStage sourceStage, WorkflowTransition transition,
-                                                        Map<String, Object> procedureData,
+                                                        Map<String, Object> tramiteData,
                                                         List<WorkflowTransition> transitions, Set<String> visitedStageIds) {
         List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceStage, transitions, visitedStageIds);
         Map<String, Object> forwardConfig = transition.getForwardConfig();
@@ -601,7 +617,7 @@ public class ProcedureService {
         return sourceFields.stream()
                 .filter(field -> shouldIncludeField(field, mode, selectedFieldNames, includeFiles))
                 .map(field -> {
-                    Object value = procedureData.get(field.getName());
+                    Object value = tramiteData.get(field.getName());
                     if (value == null || String.valueOf(value).isBlank()) return null;
                     Map<String, Object> map = new LinkedHashMap<>();
                     map.put("label", field.getName());
@@ -665,17 +681,17 @@ public class ProcedureService {
         return new ArrayList<>(deduped.values());
     }
 
-    private void handleJoinSyncIfNeeded(Procedure procedure, WorkflowStage joinStage, String userId) {
-        List<WorkflowTransition> allTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(procedure.getWorkflowId());
+    private void handleJoinSyncIfNeeded(Tramite tramite, WorkflowStage joinStage, String userId) {
+        List<WorkflowTransition> allTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(tramite.getWorkflowId());
         long expectedBranches = allTransitions.stream()
                 .filter(t -> joinStage.getId().equals(t.getToStageId()))
                 .count();
 
-        String rootId = procedure.getParentProcedureId() != null ? procedure.getParentProcedureId() : procedure.getId();
-        Procedure root = procedureRepo.findById(rootId).orElse(null);
+        String rootId = tramite.getParentTramiteId() != null ? tramite.getParentTramiteId() : tramite.getId();
+        Tramite root = tramiteRepo.findById(rootId).orElse(null);
         if (root == null) return;
 
-        List<Procedure> clones = procedureRepo.findByParentProcedureId(rootId);
+        List<Tramite> clones = tramiteRepo.findByParentTramiteId(rootId);
         long arrivedCount = (joinStage.getId().equals(root.getCurrentStageId()) ? 1 : 0)
                 + clones.stream().filter(c -> joinStage.getId().equals(c.getCurrentStageId())).count();
 
@@ -683,7 +699,7 @@ public class ProcedureService {
 
         Map<String, Object> merged = new LinkedHashMap<>();
         if (root.getFormData() != null) merged.putAll(root.getFormData());
-        for (Procedure clone : clones) {
+        for (Tramite clone : clones) {
             if (clone.getFormData() != null) merged.putAll(clone.getFormData());
         }
         root.setFormData(merged);
@@ -696,16 +712,16 @@ public class ProcedureService {
             WorkflowStage nextStage = stageRepo.findById(nextTransition.getToStageId()).orElse(null);
             boolean isFinal = nextStage != null && "END".equalsIgnoreCase(nextStage.getNodeType());
             root.setCurrentStageId(nextTransition.getToStageId());
-            root.setStatus(isFinal ? Procedure.Status.COMPLETED : Procedure.Status.IN_PROGRESS);
-            procedureRepo.save(root);
-            recordHistory(root.getId(), joinStage.getId(), nextTransition.getToStageId(), "JOIN_ADVANCED", userId, "Todas las ramas completadas");
+            root.setStatus(isFinal ? Tramite.Status.COMPLETADO : Tramite.Status.EN_PROGRESO);
+            tramiteRepo.save(root);
+            recordHistory(root.getId(), joinStage.getId(), nextTransition.getToStageId(), "UNION_COMPLETADA", userId, "Todas las ramas completadas");
         }
 
-        clones.forEach(clone -> procedureRepo.deleteById(clone.getId()));
+        clones.forEach(clone -> tramiteRepo.deleteById(clone.getId()));
     }
 
     private boolean isPassThroughNode(WorkflowStage stage) {
-        return hasNodeType(stage, "decision", "fork", "join", "loop");
+        return hasNodeType(stage, "decision", "bifurcasion", "join", "loop");
     }
 
     private boolean hasNodeType(WorkflowStage stage, String... nodeTypes) {
@@ -719,9 +735,9 @@ public class ProcedureService {
 
     private String resolveLoopHistoryAction(WorkflowTransition transition) {
         String name = transition.getName() == null ? "" : transition.getName().trim().toLowerCase();
-        if (name.equals("repetir")) return "LOOP_REJECTED";
-        if (name.equals("salir")) return "LOOP_APPROVED";
-        return "LOOP_EVALUATED";
+        if (name.equals("repetir")) return "LOOP_RECHAZADO";
+        if (name.equals("salir")) return "LOOP_APROBADO";
+        return "LOOP_EVALUADO";
     }
 
     private String resolveBranchOutcome(WorkflowStage decisionStage, WorkflowTransition branch) {
@@ -751,12 +767,22 @@ public class ProcedureService {
     }
 
     private boolean matchesStageResponsibility(WorkflowStage stage, User actor) {
-        if (stage.getResponsibleDepartmentId() != null && !stage.getResponsibleDepartmentId().isBlank()) {
+        boolean hasJobRole = stage.getResponsibleJobRoleId() != null && !stage.getResponsibleJobRoleId().isBlank();
+        boolean hasDepartment = stage.getResponsibleDepartmentId() != null && !stage.getResponsibleDepartmentId().isBlank();
+        boolean hasRole = stage.getResponsibleRole() != null;
+
+        if (hasJobRole) {
+            boolean matchesJobRole = stage.getResponsibleJobRoleId().equals(actor.getJobRoleId());
+            if (!matchesJobRole) return false;
+            return !hasDepartment || (actor.getDepartmentId() != null && actor.getDepartmentId().equals(stage.getResponsibleDepartmentId()));
+        }
+        if (hasDepartment) {
             return actor.getDepartmentId() != null && actor.getDepartmentId().equals(stage.getResponsibleDepartmentId());
         }
-        if (stage.getResponsibleRole() != null) {
+        if (hasRole) {
             return actor.getRole() == stage.getResponsibleRole();
         }
         return false;
     }
+
 }

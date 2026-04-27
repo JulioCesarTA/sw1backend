@@ -1,6 +1,8 @@
 package com.workflow.auth.service;
 
+import com.workflow.model.JobRole;
 import com.workflow.model.User;
+import com.workflow.repository.JobRoleRepository;
 import com.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,6 +17,7 @@ import java.util.Map;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final JobRoleRepository jobRoleRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
 
@@ -98,14 +101,20 @@ public class AuthService {
     }
 
     private Map<String, Object> sanitize(User user) {
-        return Map.of(
-                "id", user.getId(),
-                "name", user.getName(),
-                "email", user.getEmail(),
-                "role", user.getRole().name(),
-                "companyId", user.getCompanyId() == null ? "" : user.getCompanyId(),
-                "departmentId", user.getDepartmentId() == null ? "" : user.getDepartmentId(),
-                "jobTitle", user.getJobTitle() == null ? "" : user.getJobTitle()
-        );
+        String jobRoleName = "";
+        if (user.getJobRoleId() != null && !user.getJobRoleId().isBlank()) {
+            jobRoleName = jobRoleRepository.findById(user.getJobRoleId())
+                    .map(JobRole::getName).orElse("");
+        }
+        java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+        map.put("id", user.getId());
+        map.put("name", user.getName());
+        map.put("email", user.getEmail());
+        map.put("role", user.getRole().name());
+        map.put("companyId", user.getCompanyId() == null ? "" : user.getCompanyId());
+        map.put("departmentId", user.getDepartmentId() == null ? "" : user.getDepartmentId());
+        map.put("jobRoleId", user.getJobRoleId() == null ? "" : user.getJobRoleId());
+        map.put("jobRoleName", jobRoleName);
+        return map;
     }
 }

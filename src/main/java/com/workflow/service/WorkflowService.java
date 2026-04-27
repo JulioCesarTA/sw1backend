@@ -67,14 +67,13 @@ public class WorkflowService {
             map.put("companyId", wf.getCompanyId());
             map.put("companyName", wf.getCompanyId() != null ? companyNames.get(wf.getCompanyId()) : null);
             map.put("stages", stages);
-            map.put("_count", Map.of("procedures", 0, "stages", stages.size()));
+            map.put("_count", Map.of("tramites", 0, "stages", stages.size()));
             return map;
         }).toList();
     }
 
     public Map<String, Object> findOne(String id, User actor) {
-        Workflow workflow = workflowRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow no encontrado"));
+        Workflow workflow = findWorkflow(id);
         validateWorkflowScope(actor, workflow);
         return enrichWorkflowFull(workflow);
     }
@@ -91,8 +90,7 @@ public class WorkflowService {
     }
 
     public Workflow update(String id, Map<String, Object> body, User actor) {
-        Workflow workflow = workflowRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow no encontrado"));
+        Workflow workflow = findWorkflow(id);
         validateWorkflowScope(actor, workflow);
         if (actor.getRole() != User.Role.SUPERADMIN) {
             body.put("companyId", actor.getCompanyId());
@@ -104,8 +102,7 @@ public class WorkflowService {
     }
 
     public void remove(String id, User actor) {
-        Workflow workflow = workflowRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow no encontrado"));
+        Workflow workflow = findWorkflow(id);
         validateWorkflowScope(actor, workflow);
         workflowRepo.deleteById(id);
     }
@@ -135,28 +132,12 @@ public class WorkflowService {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "No se pudo asignar un orden disponible para la etapa");
     }
 
-    public List<WorkflowStage> findStagesByWorkflow(String workflowId) {
-        return stageRepo.findByWorkflowIdOrderByOrderAsc(workflowId);
-    }
-
-    public List<WorkflowStage> findStagesByWorkflow(String workflowId, User actor) {
-        return findStagesByWorkflow(workflowId);
-    }
-
     public WorkflowStage findStage(String id) {
         return stageRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Etapa no encontrada"));
     }
 
     public WorkflowStage updateStage(String id, Map<String, Object> body) {
-        WorkflowStage stage = findStage(id);
-        applyStageFields(stage, body);
-        WorkflowStage saved = stageRepo.save(stage);
-        syncStageFormDefinition(saved, body);
-        return saved;
-    }
-
-    public WorkflowStage updateStage(String id, Map<String, Object> body, User actor) {
         WorkflowStage stage = findStage(id);
         applyStageFields(stage, body);
         WorkflowStage saved = stageRepo.save(stage);
@@ -188,19 +169,9 @@ public class WorkflowService {
         return transitionRepo.save(transition);
     }
 
-    public WorkflowTransition updateTransition(String id, Map<String, Object> body, User actor) {
-        WorkflowTransition transition = findTransition(id);
-        applyTransitionFields(transition, body);
-        return transitionRepo.save(transition);
-    }
-
     public void deleteTransition(String id) {
         findTransition(id);
         transitionRepo.deleteById(id);
-    }
-
-    public List<WorkflowTransition> getTransitions(String workflowId) {
-        return transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflowId);
     }
 
     private void applyStageFields(WorkflowStage stage, Map<String, Object> body) {
@@ -220,14 +191,10 @@ public class WorkflowService {
         }
         if (body.containsKey("responsibleDepartmentId")) stage.setResponsibleDepartmentId((String) body.get("responsibleDepartmentId"));
         if (body.containsKey("requiresForm")) stage.setRequiresForm(Boolean.TRUE.equals(body.get("requiresForm")));
-        if (body.containsKey("slaHours") && body.get("slaHours") != null) {
-            stage.setSlaHours(((Number) body.get("slaHours")).intValue());
+        if (body.containsKey("avgHours") && body.get("avgHours") != null) {
+            stage.setAvgHours(((Number) body.get("avgHours")).intValue());
         }
-        if (body.containsKey("nodeType")) stage.setNodeType((String) body.get("nodeType"));
-        if (body.containsKey("isConditional")) stage.setConditional(Boolean.TRUE.equals(body.get("isConditional")));
-        if (body.containsKey("condition")) stage.setCondition((String) body.get("condition"));
-        if (body.containsKey("trueLabel")) stage.setTrueLabel((String) body.get("trueLabel"));
-        if (body.containsKey("falseLabel")) stage.setFalseLabel((String) body.get("falseLabel"));
+        if (body.containsKey("nodeType")) stage.setNodeType(normalizeNodeType((String) body.get("nodeType")));
         if (body.containsKey("posX") && body.get("posX") != null) {
             stage.setPosX(((Number) body.get("posX")).doubleValue());
         }
@@ -243,7 +210,7 @@ public class WorkflowService {
             return;
         }
 
-        boolean isProcessStage = "process".equalsIgnoreCase(stage.getNodeType());
+        boolean isProcessStage = "proceso".equalsIgnoreCase(stage.getNodeType()) || "process".equalsIgnoreCase(stage.getNodeType());
         boolean hasFormPayload = body.containsKey("formDefinition");
 
         if (!isProcessStage || !stage.isRequiresForm()) {
@@ -286,11 +253,6 @@ public class WorkflowService {
             mapped.setName((String) field.getOrDefault("name", field.get("id")));
             mapped.setType(parseFieldType(field.get("type")));
 
-            Object options = field.get("options");
-            if (options instanceof List<?> optionList) {
-                mapped.setOptions(optionList.stream().map(String::valueOf).toList());
-            }
-
             boolean required = Boolean.TRUE.equals(field.get("required")) || Boolean.TRUE.equals(field.get("isRequired"));
             mapped.setRequired(required);
 
@@ -310,6 +272,18 @@ public class WorkflowService {
         } catch (IllegalArgumentException ex) {
             return FormDefinition.FieldType.TEXT;
         }
+    }
+
+    private String normalizeNodeType(String rawNodeType) {
+        if (rawNodeType == null || rawNodeType.isBlank()) {
+            return rawNodeType;
+        }
+        return switch (rawNodeType.trim().toLowerCase()) {
+            case "process", "proceso" -> "proceso";
+            case "fork", "bifurcation", "bifurcasion" -> "bifurcasion";
+            case "union", "join" -> "join";
+            default -> rawNodeType.trim().toLowerCase();
+        };
     }
 
     private Integer extractRequestedOrder(Map<String, Object> body) {
@@ -347,7 +321,6 @@ public class WorkflowService {
         if (body.containsKey("fromStageId")) transition.setFromStageId((String) body.get("fromStageId"));
         if (body.containsKey("toStageId")) transition.setToStageId((String) body.get("toStageId"));
         if (body.containsKey("name")) transition.setName((String) body.getOrDefault("name", ""));
-        if (body.containsKey("condition")) transition.setCondition((String) body.get("condition"));
         if (body.containsKey("forwardConfig")) {
             transition.setForwardConfig((Map<String, Object>) body.get("forwardConfig"));
         }
@@ -375,12 +348,8 @@ public class WorkflowService {
             mapped.put("responsibleDepartmentId", stage.getResponsibleDepartmentId());
             mapped.put("responsibleDepartmentName", stage.getResponsibleDepartmentId() != null ? deptNames.get(stage.getResponsibleDepartmentId()) : null);
             mapped.put("requiresForm", stage.isRequiresForm());
-            mapped.put("slaHours", stage.getSlaHours());
+            mapped.put("avgHours", stage.getAvgHours());
             mapped.put("nodeType", stage.getNodeType());
-            mapped.put("isConditional", stage.isConditional());
-            mapped.put("condition", stage.getCondition());
-            mapped.put("trueLabel", stage.getTrueLabel());
-            mapped.put("falseLabel", stage.getFalseLabel());
             mapped.put("posX", stage.getPosX());
             mapped.put("posY", stage.getPosY());
             mapped.put("responsibleJobRoleId", stage.getResponsibleJobRoleId());
@@ -397,8 +366,13 @@ public class WorkflowService {
         map.put("companyName", company != null ? company.getName() : null);
         map.put("stages", stagesMapped);
         map.put("transitions", transitions);
-        map.put("_count", Map.of("procedures", 0, "stages", stages.size()));
+        map.put("_count", Map.of("tramites", 0, "stages", stages.size()));
         return map;
+    }
+
+    private Workflow findWorkflow(String id) {
+        return workflowRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow no encontrado"));
     }
 
     private void validateWorkflowScope(User actor, Workflow workflow) {

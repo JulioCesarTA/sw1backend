@@ -1,7 +1,7 @@
 package com.workflow.controller;
 
 import com.workflow.model.User;
-import com.workflow.service.ProcedureService;
+import com.workflow.service.TramiteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,16 +18,16 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ActivityController {
 
-    private final ProcedureService procedureService;
+    private final TramiteService tramiteService;
 
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> list(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(procedureService.listActivities(user));
+        return ResponseEntity.ok(tramiteService.listActivities(user));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> findOne(@PathVariable("id") String id,
                                                        @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(procedureService.findActivity(id, user));
+        return ResponseEntity.ok(tramiteService.findActivity(id, user));
     }
 }

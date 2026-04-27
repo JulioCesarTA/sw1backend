@@ -36,9 +36,6 @@ public class FormService {
             ff.setType(FormDefinition.FieldType.valueOf(rawType));
             ff.setName((String) f.getOrDefault("name", f.get("id")));
             ff.setRequired(Boolean.TRUE.equals(f.get("required")) || Boolean.TRUE.equals(f.get("isRequired")));
-            @SuppressWarnings("unchecked")
-            List<String> options = (List<String>) f.get("options");
-            ff.setOptions(options);
             Object order = f.get("order");
             if (order instanceof Number number) {
                 ff.setOrder(number.intValue());

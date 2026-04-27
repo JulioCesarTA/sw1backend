@@ -2,12 +2,8 @@ package com.workflow.model;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
-
-import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -24,20 +20,9 @@ public class WorkflowStage {
     private User.Role responsibleRole;
     private String responsibleDepartmentId;
     private boolean requiresForm = false;
-    private int slaHours = 24;
-    private String nodeType = "process";
-    private boolean isConditional = false;
-    private String condition;
-    private String trueLabel = "Sí";
-    private String falseLabel = "No";
+    private int avgHours = 24;
+    private String nodeType = "proceso";
     private Double posX;
     private Double posY;
     private String responsibleJobRoleId;
-
-    @CreatedDate
-    private Instant createdAt;
-
-    @LastModifiedDate
-    private Instant updatedAt;
-
 }
