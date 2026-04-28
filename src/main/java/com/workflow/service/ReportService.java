@@ -72,9 +72,9 @@ public class ReportService {
             RolePerformanceAccumulator acc = rolePerformance.computeIfAbsent(key, ignored ->
                     new RolePerformanceAccumulator(departmentName, jobRoleName));
             acc.totalCompleted += 1;
-            acc.totalDurationHours += durationInNodo;
-            acc.totalAvgHours += nodo.getAvgHours();
-            if (durationInNodo <= nodo.getAvgHours()) {
+            acc.totalDurationMinutes += durationInNodo;
+            acc.totalAvgMinutes += nodo.getAvgMinutes();
+            if (durationInNodo <= nodo.getAvgMinutes()) {
                 acc.finishedEarly += 1;
             } else {
                 acc.finishedLate += 1;
@@ -126,8 +126,8 @@ public class ReportService {
         private int finishedEarly = 0;
         private int finishedLate = 0;
         private int totalCompleted = 0;
-        private double totalDurationHours = 0D;
-        private double totalAvgHours = 0D;
+        private double totalDurationMinutes = 0D;
+        private double totalAvgMinutes = 0D;
 
         private RolePerformanceAccumulator(String departmentName, String jobRoleName) {
             this.departmentName = departmentName;
@@ -153,8 +153,8 @@ public class ReportService {
             item.put("finishedEarly", finishedEarly);
             item.put("finishedLate", finishedLate);
             item.put("totalCompleted", totalCompleted);
-            item.put("averageDurationHours", totalCompleted == 0 ? 0D : round(totalDurationHours / totalCompleted));
-            item.put("averageAvgHours", totalCompleted == 0 ? 0D : round(totalAvgHours / totalCompleted));
+            item.put("averageDurationMinutes", totalCompleted == 0 ? 0D : round(totalDurationMinutes / totalCompleted));
+            item.put("averageAvgMinutes", totalCompleted == 0 ? 0D : round(totalAvgMinutes / totalCompleted));
             return item;
         }
 

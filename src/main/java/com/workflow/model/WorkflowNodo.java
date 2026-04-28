@@ -20,7 +20,7 @@ public class WorkflowNodo {
     private User.Role responsibleRole;
     private String responsibleDepartmentId;
     private boolean requiresForm = false;
-    private int avgHours = 0;
+    private int avgMinutes = 0;
     private String nodeType = "proceso";
     private Double posX;
     private Double posY;

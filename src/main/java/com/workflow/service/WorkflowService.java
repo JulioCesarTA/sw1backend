@@ -149,6 +149,7 @@ public class WorkflowService {
     public WorkflowTransition createTransition(Map<String, Object> body) {
         WorkflowTransition transition = new WorkflowTransition();
         applyTransitionFields(transition, body);
+        validateTransitionStructure(transition);
         return transitionRepo.save(transition);
     }
 
@@ -160,6 +161,7 @@ public class WorkflowService {
     public WorkflowTransition updateTransition(String id, Map<String, Object> body) {
         WorkflowTransition transition = findTransition(id);
         applyTransitionFields(transition, body);
+        validateTransitionStructure(transition);
         return transitionRepo.save(transition);
     }
 
@@ -185,8 +187,8 @@ public class WorkflowService {
         }
         if (body.containsKey("responsibleDepartmentId")) nodo.setResponsibleDepartmentId((String) body.get("responsibleDepartmentId"));
         if (body.containsKey("requiresForm")) nodo.setRequiresForm(Boolean.TRUE.equals(body.get("requiresForm")));
-        if (body.containsKey("avgHours") && body.get("avgHours") != null) {
-            nodo.setAvgHours(((Number) body.get("avgHours")).intValue());
+        if (body.containsKey("avgMinutes") && body.get("avgMinutes") != null) {
+            nodo.setAvgMinutes(((Number) body.get("avgMinutes")).intValue());
         }
         if (body.containsKey("nodeType")) nodo.setNodeType(normalizarTipoNodo((String) body.get("nodeType")));
         if (body.containsKey("posX") && body.get("posX") != null) {
@@ -325,6 +327,34 @@ public class WorkflowService {
         }
     }
 
+    private void validateTransitionStructure(WorkflowTransition transition) {
+        if (transition.getWorkflowId() == null || transition.getWorkflowId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workflowId es obligatorio");
+        }
+        if (transition.getFromNodoId() == null || transition.getFromNodoId().isBlank() ||
+            transition.getToNodoId() == null || transition.getToNodoId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La conexion requiere origen y destino");
+        }
+
+        WorkflowNodo fromNodo = nodoRepo.findById(transition.getFromNodoId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nodo origen no encontrado"));
+        WorkflowNodo toNodo = nodoRepo.findById(transition.getToNodoId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nodo destino no encontrado"));
+
+        if (!transition.getWorkflowId().equals(fromNodo.getWorkflowId()) || !transition.getWorkflowId().equals(toNodo.getWorkflowId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los nodos deben pertenecer al mismo workflow");
+        }
+
+        String fromType = normalizarTipoNodo(fromNodo.getNodeType());
+        String toType = normalizarTipoNodo(toNodo.getNodeType());
+        if ("inicio".equals(fromType) && !"proceso".equals(toType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inicio solo puede conectarse a un Proceso");
+        }
+        if ("fin".equals(toType) && !"proceso".equals(fromType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fin solo puede recibir conexion desde un Proceso");
+        }
+    }
+
     private Map<String, Object> enrichWorkflowFull(Workflow workflow) {
         List<WorkflowNodo> nodos = nodoRepo.findByWorkflowIdOrderByOrderAsc(workflow.getId());
         List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflow.getId());
@@ -347,7 +377,7 @@ public class WorkflowService {
             mapped.put("responsibleDepartmentId", nodo.getResponsibleDepartmentId());
             mapped.put("responsibleDepartmentName", nodo.getResponsibleDepartmentId() != null ? deptNames.get(nodo.getResponsibleDepartmentId()) : null);
             mapped.put("requiresForm", nodo.isRequiresForm());
-            mapped.put("avgHours", nodo.getAvgHours());
+            mapped.put("avgMinutes", nodo.getAvgMinutes());
             mapped.put("nodeType", nodo.getNodeType());
             mapped.put("posX", nodo.getPosX());
             mapped.put("posY", nodo.getPosY());

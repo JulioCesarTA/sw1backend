@@ -48,6 +48,12 @@ public class TramiteService {
     private final VoiceFormFillService voiceFormFillService;
     private final FcmService fcmService;
     private final ReportRealtimeService reportRealtimeService;
+    private final List<NodoTipoHandler> nodoTipoHandlers = List.of(
+            new NodoDecisionHandler(),
+            new NodoIteracionHandler(),
+            new NodoBifurcasionHandler(),
+            new NodoUnionHandler()
+    );
 
     public List<Tramite> findAll(User user) {
         if (user.getRole() == User.Role.ADMIN || user.getRole() == User.Role.SUPERADMIN) {
@@ -300,6 +306,8 @@ public class TramiteService {
         if (nodos.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El workflow no tiene etapas");
         }
+        List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflow.getId());
+        validateWorkflowStartAndEnd(nodos, transitions);
         WorkflowNodo initialNodo = nodos.stream()
                 .filter(nodo -> "inicio".equalsIgnoreCase(nodo.getNodeType()))
                 .findFirst()
@@ -321,6 +329,35 @@ public class TramiteService {
         Tramite saved = tramiteRepo.save(tramite);
         recordHistory(saved.getId(), null, initialNodo.getId(), "CREADO", requestedById, "Tramite creado");
         return saved;
+    }
+
+    private void validateWorkflowStartAndEnd(List<WorkflowNodo> nodos, List<WorkflowTransition> transitions) {
+        Map<String, WorkflowNodo> nodoById = nodos.stream().collect(Collectors.toMap(WorkflowNodo::getId, nodo -> nodo));
+
+        boolean hasInicioAProceso = transitions.stream().anyMatch(transition -> {
+            WorkflowNodo fromNodo = nodoById.get(transition.getFromNodoId());
+            WorkflowNodo toNodo = nodoById.get(transition.getToNodoId());
+            return fromNodo != null
+                    && toNodo != null
+                    && "inicio".equalsIgnoreCase(fromNodo.getNodeType())
+                    && "proceso".equalsIgnoreCase(toNodo.getNodeType());
+        });
+
+        boolean hasProcesoAFin = transitions.stream().anyMatch(transition -> {
+            WorkflowNodo fromNodo = nodoById.get(transition.getFromNodoId());
+            WorkflowNodo toNodo = nodoById.get(transition.getToNodoId());
+            return fromNodo != null
+                    && toNodo != null
+                    && "proceso".equalsIgnoreCase(fromNodo.getNodeType())
+                    && "fin".equalsIgnoreCase(toNodo.getNodeType());
+        });
+
+        if (!hasInicioAProceso || !hasProcesoAFin) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El workflow debe tener un Inicio conectado a un Proceso y un Proceso conectado a un Fin"
+            );
+        }
     }
 
     public Map<String, Object> advance(String id, Map<String, Object> body, String userId) {
@@ -369,51 +406,22 @@ public class TramiteService {
         }
 
         String previousNodoId = tramite.getCurrentNodoId();
-        WorkflowTransition finalTransition = transition;
-        WorkflowNodo passThroughNodo = nodoRepo.findById(transition.getToNodoId()).orElse(null);
-        WorkflowNodo toNodo = passThroughNodo;
-        String bifurcasionPassthroughId = null;
-        String transitionHistoryAction = "AVANZADO";
-        int transitionPathIndex = 1;
-        while (toNodo != null) {
-            if (hasNodeType(toNodo, "decision", "iteracion")) {
-                if (transitionPath.length <= transitionPathIndex) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes elegir una rama de la decision");
-                }
-                passThroughNodo = toNodo;
-                finalTransition = transitionRepo.findById(transitionPath[transitionPathIndex])
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision no encontrada"));
-                transitionPathIndex++;
-                if (!passThroughNodo.getId().equals(finalTransition.getFromNodoId())) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision invalida");
-                }
-                if (hasNodeType(passThroughNodo, "iteracion")) {
-                    transitionHistoryAction = resolveLoopHistoryAction(finalTransition);
-                } else if (hasNodeType(passThroughNodo, "decision")
-                        && "rechazo".equals(resolveBranchOutcome(passThroughNodo, finalTransition))) {
-                    transitionHistoryAction = "DECISION_RECHAZADA";
-                }
-                toNodo = nodoRepo.findById(finalTransition.getToNodoId()).orElse(null);
-                continue;
+        AdvanceCursor advanceCursor = new AdvanceCursor(
+                transition,
+                nodoRepo.findById(transition.getToNodoId()).orElse(null),
+                nodoRepo.findById(transition.getToNodoId()).orElse(null),
+                "AVANZADO",
+                1
+        );
+        while (advanceCursor.toNodo != null) {
+            NodoTipoHandler handler = findNodoTipoHandler(advanceCursor.toNodo);
+            if (!handler.consumeAdvance(advanceCursor, transitionPath, workflowTransitions)) {
+                break;
             }
-            if (hasNodeType(toNodo, "bifurcasion")) {
-                bifurcasionPassthroughId = toNodo.getId();
-                final String bifurcasionId = toNodo.getId();
-                WorkflowTransition firstBranch = workflowTransitions.stream()
-                    .filter(t -> bifurcasionId.equals(t.getFromNodoId()))
-                    .findFirst().orElse(null);
-                if (firstBranch == null) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La bifurcacion no tiene ramas configuradas");
-                }
-                finalTransition = firstBranch;
-                toNodo = nodoRepo.findById(firstBranch.getToNodoId()).orElse(null);
-                continue;
-            }
-            break;
         }
 
-        tramite.setCurrentNodoId(finalTransition.getToNodoId());
-        boolean isFinal = toNodo != null && "fin".equalsIgnoreCase(toNodo.getNodeType());
+        tramite.setCurrentNodoId(advanceCursor.finalTransition.getToNodoId());
+        boolean isFinal = advanceCursor.toNodo != null && "fin".equalsIgnoreCase(advanceCursor.toNodo.getNodeType());
         tramite.setStatus(isFinal ? Tramite.Status.COMPLETADO : Tramite.Status.EN_PROGRESO);
 
         @SuppressWarnings("unchecked")
@@ -427,22 +435,22 @@ public class TramiteService {
 
         String comment = (String) body.getOrDefault("comment", "");
         Tramite saved = tramiteRepo.save(tramite);
-        String resolvedFromNodoId = passThroughNodo != null && isPassThroughNode(passThroughNodo)
-                ? passThroughNodo.getId()
+        String resolvedFromNodoId = advanceCursor.passThroughNodo != null && isPassThroughNode(advanceCursor.passThroughNodo)
+                ? advanceCursor.passThroughNodo.getId()
                 : previousNodoId;
-        boolean recordsEvaluationAndAdvance = "DECISION_RECHAZADA".equals(transitionHistoryAction)
-                || "LOOP_RECHAZADO".equals(transitionHistoryAction)
-                || "LOOP_APROBADO".equals(transitionHistoryAction)
-                || "LOOP_EVALUADO".equals(transitionHistoryAction);
+        boolean recordsEvaluationAndAdvance = "DECISION_RECHAZADA".equals(advanceCursor.transitionHistoryAction)
+                || "LOOP_RECHAZADO".equals(advanceCursor.transitionHistoryAction)
+                || "LOOP_APROBADO".equals(advanceCursor.transitionHistoryAction)
+                || "LOOP_EVALUADO".equals(advanceCursor.transitionHistoryAction);
         if (recordsEvaluationAndAdvance) {
-            recordHistory(saved.getId(), previousNodoId, previousNodoId, transitionHistoryAction, userId, comment);
-            recordHistory(saved.getId(), resolvedFromNodoId, finalTransition.getToNodoId(), "AVANZADO", userId, comment);
+            recordHistory(saved.getId(), previousNodoId, previousNodoId, advanceCursor.transitionHistoryAction, userId, comment);
+            recordHistory(saved.getId(), resolvedFromNodoId, advanceCursor.finalTransition.getToNodoId(), "AVANZADO", userId, comment);
         } else {
             recordHistory(
                     saved.getId(),
                     resolvedFromNodoId,
-                    finalTransition.getToNodoId(),
-                    transitionHistoryAction,
+                    advanceCursor.finalTransition.getToNodoId(),
+                    advanceCursor.transitionHistoryAction,
                     userId,
                     comment
             );
@@ -452,11 +460,11 @@ public class TramiteService {
                     "Tu trámite " + saved.getCode() + " ha sido completado exitosamente.");
         }
 
-        String fromNodoForBifurcasion = bifurcasionPassthroughId != null ? bifurcasionPassthroughId : previousNodoId;
-        handleBifurcasionSplitIfNeeded(saved, fromNodoForBifurcasion, finalTransition.getId(), userId);
+        String fromNodoForBifurcasion = advanceCursor.bifurcasionPassthroughId != null ? advanceCursor.bifurcasionPassthroughId : previousNodoId;
+        handleBifurcasionSplitIfNeeded(saved, fromNodoForBifurcasion, advanceCursor.finalTransition.getId(), userId);
 
-        if (hasNodeType(toNodo, "union")) {
-            handleJoinSyncIfNeeded(saved, toNodo, userId);
+        if (hasNodeType(advanceCursor.toNodo, "union")) {
+            handleJoinSyncIfNeeded(saved, advanceCursor.toNodo, userId);
         }
 
         if (publishReports) {
@@ -570,24 +578,10 @@ public class TramiteService {
         for (WorkflowTransition transition : transitions) {
             if (!currentNodo.getId().equals(transition.getFromNodoId())) continue;
             WorkflowNodo directTarget = nodoRepo.findById(transition.getToNodoId()).orElse(null);
-            if (hasNodeType(directTarget, "decision", "iteracion")) {
-                for (WorkflowTransition branch : transitions) {
-                    if (!directTarget.getId().equals(branch.getFromNodoId())) continue;
-                    WorkflowNodo finalTarget = nodoRepo.findById(branch.getToNodoId()).orElse(null);
-                    Map<String, Object> option = new LinkedHashMap<>();
-                    option.put("id", transition.getId() + ">>" + branch.getId());
-                    option.put("name", branch.getName());
-                    option.put("label", branch.getName());
-                    option.put("fromNodoId", transition.getFromNodoId());
-                    option.put("toNodoId", branch.getToNodoId());
-                    option.put("nodoDecisionId", directTarget.getId());
-                    option.put("nodoDecisionNombre", directTarget.getName());
-                    option.put("tipoNodoDecision", directTarget.getNodeType());
-                    option.put("resultadoRama", resolveBranchOutcome(directTarget, branch));
-                    option.put("targetNodoName", finalTarget != null ? finalTarget.getName() : branch.getToNodoId());
-                    option.put("tipo", "rama-decision");
-                    available.add(option);
-                }
+            List<Map<String, Object>> expandedOptions = findNodoTipoHandler(directTarget)
+                    .buildTransitionOptions(transition, directTarget, transitions);
+            if (!expandedOptions.isEmpty()) {
+                available.addAll(expandedOptions);
                 continue;
             }
             Map<String, Object> option = new LinkedHashMap<>();
@@ -762,7 +756,7 @@ public class TramiteService {
     }
 
     private boolean isPassThroughNode(WorkflowNodo nodo) {
-        return hasNodeType(nodo, "decision", "bifurcasion", "union", "iteracion");
+        return findNodoTipoHandler(nodo).isPassThrough();
     }
 
     private boolean hasNodeType(WorkflowNodo nodo, String... nodeTypes) {
@@ -772,13 +766,6 @@ public class TramiteService {
             if (value.equals(nodeType)) return true;
         }
         return false;
-    }
-
-    private String resolveLoopHistoryAction(WorkflowTransition transition) {
-        String name = transition.getName() == null ? "" : transition.getName().trim().toLowerCase();
-        if (name.equals("repetir")) return "LOOP_RECHAZADO";
-        if (name.equals("salir")) return "LOOP_APROBADO";
-        return "LOOP_EVALUADO";
     }
 
     private String resolveBranchOutcome(WorkflowNodo decisionNodo, WorkflowTransition branch) {
@@ -792,6 +779,197 @@ public class TramiteService {
             if (name.equals("no") || name.equals("rechazado") || name.equals("rechazar")) return "rechazo";
         }
         return null;
+    }
+
+    private NodoTipoHandler findNodoTipoHandler(WorkflowNodo nodo) {
+        if (nodo == null) {
+            return NodoTipoHandler.DEFAULT;
+        }
+        return nodoTipoHandlers.stream()
+                .filter(handler -> handler.supports(nodo))
+                .findFirst()
+                .orElse(NodoTipoHandler.DEFAULT);
+    }
+
+    private static final class AdvanceCursor {
+        private WorkflowTransition finalTransition;
+        private WorkflowNodo passThroughNodo;
+        private WorkflowNodo toNodo;
+        private String bifurcasionPassthroughId;
+        private String transitionHistoryAction;
+        private int transitionPathIndex;
+
+        private AdvanceCursor(WorkflowTransition finalTransition,
+                              WorkflowNodo passThroughNodo,
+                              WorkflowNodo toNodo,
+                              String transitionHistoryAction,
+                              int transitionPathIndex) {
+            this.finalTransition = finalTransition;
+            this.passThroughNodo = passThroughNodo;
+            this.toNodo = toNodo;
+            this.transitionHistoryAction = transitionHistoryAction;
+            this.transitionPathIndex = transitionPathIndex;
+        }
+    }
+
+    private abstract static class NodoTipoHandler {
+        private static final NodoTipoHandler DEFAULT = new NodoTipoHandler() {
+            @Override
+            boolean supports(WorkflowNodo nodo) {
+                return true;
+            }
+        };
+
+        abstract boolean supports(WorkflowNodo nodo);
+
+        boolean isPassThrough() {
+            return false;
+        }
+
+        boolean consumeAdvance(AdvanceCursor cursor, String[] transitionPath, List<WorkflowTransition> workflowTransitions) {
+            return false;
+        }
+
+        List<Map<String, Object>> buildTransitionOptions(WorkflowTransition transition, WorkflowNodo directTarget,
+                                                         List<WorkflowTransition> transitions) {
+            return List.of();
+        }
+
+        String resolveBranchOutcome(WorkflowTransition branch) {
+            return null;
+        }
+    }
+
+    private abstract class NodoDecisionBaseHandler extends NodoTipoHandler {
+        @Override
+        boolean isPassThrough() {
+            return true;
+        }
+
+        @Override
+        boolean consumeAdvance(AdvanceCursor cursor, String[] transitionPath, List<WorkflowTransition> workflowTransitions) {
+            if (transitionPath.length <= cursor.transitionPathIndex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes elegir una rama de la decision");
+            }
+            cursor.passThroughNodo = cursor.toNodo;
+            cursor.finalTransition = transitionRepo.findById(transitionPath[cursor.transitionPathIndex])
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision no encontrada"));
+            cursor.transitionPathIndex++;
+            if (!cursor.passThroughNodo.getId().equals(cursor.finalTransition.getFromNodoId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision invalida");
+            }
+            cursor.transitionHistoryAction = resolveTransitionHistoryAction(cursor.finalTransition);
+            cursor.toNodo = nodoRepo.findById(cursor.finalTransition.getToNodoId()).orElse(null);
+            return true;
+        }
+
+        @Override
+        List<Map<String, Object>> buildTransitionOptions(WorkflowTransition transition, WorkflowNodo directTarget,
+                                                         List<WorkflowTransition> transitions) {
+            List<Map<String, Object>> options = new ArrayList<>();
+            for (WorkflowTransition branch : transitions) {
+                if (!directTarget.getId().equals(branch.getFromNodoId())) continue;
+                WorkflowNodo finalTarget = nodoRepo.findById(branch.getToNodoId()).orElse(null);
+                Map<String, Object> option = new LinkedHashMap<>();
+                option.put("id", transition.getId() + ">>" + branch.getId());
+                option.put("name", branch.getName());
+                option.put("label", branch.getName());
+                option.put("fromNodoId", transition.getFromNodoId());
+                option.put("toNodoId", branch.getToNodoId());
+                option.put("nodoDecisionId", directTarget.getId());
+                option.put("nodoDecisionNombre", directTarget.getName());
+                option.put("tipoNodoDecision", directTarget.getNodeType());
+                option.put("resultadoRama", resolveBranchOutcome(branch));
+                option.put("targetNodoName", finalTarget != null ? finalTarget.getName() : branch.getToNodoId());
+                option.put("tipo", "rama-decision");
+                options.add(option);
+            }
+            return options;
+        }
+
+        abstract String resolveTransitionHistoryAction(WorkflowTransition transition);
+    }
+
+    private final class NodoDecisionHandler extends NodoDecisionBaseHandler {
+        @Override
+        boolean supports(WorkflowNodo nodo) {
+            return hasNodeType(nodo, "decision");
+        }
+
+        @Override
+        String resolveTransitionHistoryAction(WorkflowTransition transition) {
+            return "rechazo".equals(resolveBranchOutcome(transition)) ? "DECISION_RECHAZADA" : "AVANZADO";
+        }
+
+        @Override
+        String resolveBranchOutcome(WorkflowTransition branch) {
+            String name = branch.getName() == null ? "" : branch.getName().trim().toLowerCase();
+            if (name.equals("si") || name.equals("sí") || name.equals("aprobado") || name.equals("aceptado")) return "aceptacion";
+            if (name.equals("no") || name.equals("rechazado") || name.equals("rechazar")) return "rechazo";
+            return null;
+        }
+    }
+
+    private final class NodoIteracionHandler extends NodoDecisionBaseHandler {
+        @Override
+        boolean supports(WorkflowNodo nodo) {
+            return hasNodeType(nodo, "iteracion");
+        }
+
+        @Override
+        String resolveTransitionHistoryAction(WorkflowTransition transition) {
+            String name = transition.getName() == null ? "" : transition.getName().trim().toLowerCase();
+            if (name.equals("repetir")) return "LOOP_RECHAZADO";
+            if (name.equals("salir")) return "LOOP_APROBADO";
+            return "LOOP_EVALUADO";
+        }
+
+        @Override
+        String resolveBranchOutcome(WorkflowTransition branch) {
+            String name = branch.getName() == null ? "" : branch.getName().trim().toLowerCase();
+            if (name.equals("repetir")) return "rechazo";
+            if (name.equals("salir")) return "aceptacion";
+            return null;
+        }
+    }
+
+    private final class NodoBifurcasionHandler extends NodoTipoHandler {
+        @Override
+        boolean supports(WorkflowNodo nodo) {
+            return hasNodeType(nodo, "bifurcasion");
+        }
+
+        @Override
+        boolean isPassThrough() {
+            return true;
+        }
+
+        @Override
+        boolean consumeAdvance(AdvanceCursor cursor, String[] transitionPath, List<WorkflowTransition> workflowTransitions) {
+            cursor.bifurcasionPassthroughId = cursor.toNodo.getId();
+            WorkflowTransition firstBranch = workflowTransitions.stream()
+                    .filter(t -> cursor.toNodo.getId().equals(t.getFromNodoId()))
+                    .findFirst()
+                    .orElse(null);
+            if (firstBranch == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La bifurcacion no tiene ramas configuradas");
+            }
+            cursor.finalTransition = firstBranch;
+            cursor.toNodo = nodoRepo.findById(firstBranch.getToNodoId()).orElse(null);
+            return true;
+        }
+    }
+
+    private final class NodoUnionHandler extends NodoTipoHandler {
+        @Override
+        boolean supports(WorkflowNodo nodo) {
+            return hasNodeType(nodo, "union");
+        }
+
+        @Override
+        boolean isPassThrough() {
+            return true;
+        }
     }
 
 }

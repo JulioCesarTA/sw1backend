@@ -8,6 +8,5 @@ import java.util.List;
 
 public interface HistorialTramiteRepository extends MongoRepository<HistorialTramite, String> {
     List<HistorialTramite> findByTramiteIdOrderByChangedAtAsc(String tramiteId);
-    List<HistorialTramite> findByToNodoId(String nodoId);
     List<HistorialTramite> findByTramiteIdIn(Collection<String> tramiteIds);
 }

@@ -2,7 +2,12 @@ package com.workflow;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.io.IOException;
@@ -19,6 +24,27 @@ public class WorkflowApplication {
     public static void main(String[] args) {
         loadDotEnv();
         SpringApplication.run(WorkflowApplication.class, args);
+    }
+
+    @Bean
+    org.springframework.boot.CommandLineRunner migrateWorkflowNodoAvgField(MongoTemplate mongoTemplate) {
+        return args -> {
+            Query query = new Query(new Criteria().andOperator(
+                    Criteria.where("avgHours").exists(true),
+                    Criteria.where("avgMinutes").exists(false)
+            ));
+            for (var document : mongoTemplate.find(query, org.bson.Document.class, "workflow_nodo")) {
+                Object avgHours = document.get("avgHours");
+                if (!(avgHours instanceof Number number)) {
+                    continue;
+                }
+                mongoTemplate.updateFirst(
+                        new Query(Criteria.where("_id").is(document.get("_id"))),
+                        new Update().set("avgMinutes", number.intValue()).unset("avgHours"),
+                        "workflow_nodo"
+                );
+            }
+        };
     }
 
     private static void loadDotEnv() {
