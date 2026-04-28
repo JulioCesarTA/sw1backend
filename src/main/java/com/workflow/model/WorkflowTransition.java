@@ -18,8 +18,8 @@ public class WorkflowTransition {
     private String id;
 
     private String workflowId;
-    private String fromStageId;
-    private String toStageId;
+    private String fromNodoId;
+    private String toNodoId;
     private String name;
     private String condition;
     private Map<String, Object> forwardConfig;

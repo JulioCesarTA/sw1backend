@@ -8,5 +8,5 @@ import java.util.List;
 public interface WorkflowTransitionRepository extends MongoRepository<WorkflowTransition, String> {
     List<WorkflowTransition> findByWorkflowIdOrderByCreatedAtAsc(String workflowId);
     java.util.Optional<WorkflowTransition> findByIdAndWorkflowId(String id, String workflowId);
-    void deleteByFromStageIdOrToStageId(String fromStageId, String toStageId);
+    void deleteByFromNodoIdOrToNodoId(String fromNodoId, String toNodoId);
 }

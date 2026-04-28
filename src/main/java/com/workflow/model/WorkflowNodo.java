@@ -7,8 +7,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 @Data
 @NoArgsConstructor
-@Document(collection = "workflow_stages")
-public class WorkflowStage {
+@Document(collection = "workflow_nodo")
+public class WorkflowNodo {
 
     @Id
     private String id;
@@ -20,7 +20,7 @@ public class WorkflowStage {
     private User.Role responsibleRole;
     private String responsibleDepartmentId;
     private boolean requiresForm = false;
-    private int avgHours = 24;
+    private int avgHours = 0;
     private String nodeType = "proceso";
     private Double posX;
     private Double posY;

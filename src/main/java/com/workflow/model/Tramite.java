@@ -27,7 +27,7 @@ public class Tramite {
     private String description;
     private String workflowId;
     private Status status = Status.PENDIENTE;
-    private String currentStageId;
+    private String currentNodoId;
     private String requestedById;
     private String assignedUserId;
     private Map<String, Object> formData;
@@ -40,17 +40,15 @@ public class Tramite {
     private Instant updatedAt;
 
     public enum Status {
-        PENDIENTE, EN_PROGRESO, OBSERVADO, APROBADO, RECHAZADO, COMPLETADO;
+        PENDIENTE, EN_PROGRESO, RECHAZADO, COMPLETADO;
 
         @JsonCreator
         public static Status fromJson(String value) {
             if (value == null) return PENDIENTE;
             return switch (value.toUpperCase()) {
-                case "EN_PROGRESO", "IN_PROGRESS" -> EN_PROGRESO;
-                case "OBSERVADO",   "OBSERVED"    -> OBSERVADO;
-                case "APROBADO",    "APPROVED"    -> APROBADO;
-                case "RECHAZADO",   "REJECTED"    -> RECHAZADO;
-                case "COMPLETADO",  "COMPLETED"   -> COMPLETADO;
+                case "EN_PROGRESO" -> EN_PROGRESO;
+                case "RECHAZADO" -> RECHAZADO;
+                case "COMPLETADO" -> COMPLETADO;
                 default -> PENDIENTE;
             };
         }

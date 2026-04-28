@@ -15,8 +15,8 @@ public class FormDefinition {
     @Id
     private String id;
 
-    @Indexed(unique = true)
-    private String stageId;
+    @Indexed(unique = true, sparse = true)
+    private String nodoId;
 
     private String title;
     private List<FormField> fields;

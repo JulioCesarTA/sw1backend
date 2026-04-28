@@ -40,6 +40,13 @@ public class ActivityController {
         return ResponseEntity.ok(tramiteService.advance(id, body, user.getId()));
     }
 
+    @PostMapping("/{id}/voice-fill")
+    public ResponseEntity<Map<String, Object>> voiceFill(@PathVariable("id") String id,
+                                                         @RequestBody Map<String, Object> body,
+                                                         @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(tramiteService.parseVoiceFill(id, body, user));
+    }
+
     @PostMapping("/{id}/reject")
     public ResponseEntity<?> reject(@PathVariable("id") String id,
                                     @RequestBody Map<String, Object> body,

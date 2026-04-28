@@ -7,7 +7,7 @@ import com.workflow.model.Tramite;
 import com.workflow.model.HistorialTramite;
 import com.workflow.model.User;
 import com.workflow.model.Workflow;
-import com.workflow.model.WorkflowStage;
+import com.workflow.model.WorkflowNodo;
 import com.workflow.model.WorkflowTransition;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.FormDefinitionRepository;
@@ -16,7 +16,7 @@ import com.workflow.repository.HistorialTramiteRepository;
 import com.workflow.repository.TramiteRepository;
 import com.workflow.repository.UserRepository;
 import com.workflow.repository.WorkflowRepository;
-import com.workflow.repository.WorkflowStageRepository;
+import com.workflow.repository.WorkflowNodoRepository;
 import com.workflow.repository.WorkflowTransitionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -39,12 +39,13 @@ public class TramiteService {
     private final TramiteRepository tramiteRepo;
     private final HistorialTramiteRepository historyRepo;
     private final WorkflowRepository workflowRepo;
-    private final WorkflowStageRepository stageRepo;
+    private final WorkflowNodoRepository nodoRepo;
     private final WorkflowTransitionRepository transitionRepo;
     private final FormDefinitionRepository formRepo;
     private final JobRoleRepository jobRoleRepo;
     private final DepartmentRepository departmentRepo;
     private final UserRepository userRepository;
+    private final VoiceFormFillService voiceFormFillService;
     private final FcmService fcmService;
     private final ReportRealtimeService reportRealtimeService;
 
@@ -75,101 +76,101 @@ public class TramiteService {
                 ? tramiteRepo.findByParentTramiteId(tramite.getId()).stream()
                         .filter(c -> c.getStatus() != Tramite.Status.COMPLETADO
                                 && c.getStatus() != Tramite.Status.RECHAZADO
-                                && c.getCurrentStageId() != null)
+                                && c.getCurrentNodoId() != null)
                         .collect(Collectors.toList())
                 : List.of();
 
-        Set<String> activeStageIds = new java.util.HashSet<>();
-        WorkflowStage rootCurrentStage = isActive && tramite.getCurrentStageId() != null
-                ? stageRepo.findById(tramite.getCurrentStageId()).orElse(null)
+        Set<String> activeNodoIds = new java.util.HashSet<>();
+        WorkflowNodo rootCurrentNodo = isActive && tramite.getCurrentNodoId() != null
+                ? nodoRepo.findById(tramite.getCurrentNodoId()).orElse(null)
                 : null;
-        boolean rootIsWaitingOnPassThrough = rootCurrentStage != null
-                && isPassThroughNode(rootCurrentStage)
+        boolean rootIsWaitingOnPassThrough = rootCurrentNodo != null
+                && isPassThroughNode(rootCurrentNodo)
                 && !activeClones.isEmpty();
-        if (isActive && tramite.getCurrentStageId() != null && !rootIsWaitingOnPassThrough) {
-            activeStageIds.add(tramite.getCurrentStageId());
+        if (isActive && tramite.getCurrentNodoId() != null && !rootIsWaitingOnPassThrough) {
+            activeNodoIds.add(tramite.getCurrentNodoId());
         }
-        activeClones.forEach(c -> activeStageIds.add(c.getCurrentStageId()));
+        activeClones.forEach(c -> activeNodoIds.add(c.getCurrentNodoId()));
 
-        Set<String> allStageIds = history.stream()
-                .filter(h -> h.getToStageId() != null)
-                .map(HistorialTramite::getToStageId)
+        Set<String> allNodoIds = history.stream()
+                .filter(h -> h.getToNodoId() != null)
+                .map(HistorialTramite::getToNodoId)
                 .collect(Collectors.toSet());
-        allStageIds.addAll(activeStageIds);
-        Map<String, WorkflowStage> stageMap = stageRepo.findAllById(allStageIds).stream()
-                .collect(Collectors.toMap(WorkflowStage::getId, s -> s));
+        allNodoIds.addAll(activeNodoIds);
+        Map<String, WorkflowNodo> nodoMap = nodoRepo.findAllById(allNodoIds).stream()
+                .collect(Collectors.toMap(WorkflowNodo::getId, s -> s));
 
-        Set<String> deptIds = stageMap.values().stream()
+        Set<String> deptIds = nodoMap.values().stream()
                 .filter(s -> s.getResponsibleDepartmentId() != null)
-                .map(WorkflowStage::getResponsibleDepartmentId)
+                .map(WorkflowNodo::getResponsibleDepartmentId)
                 .collect(Collectors.toSet());
         Map<String, String> deptNameMap = departmentRepo.findAllById(deptIds).stream()
                 .collect(Collectors.toMap(Department::getId, Department::getName));
 
-        Set<String> roleIds = stageMap.values().stream()
+        Set<String> roleIds = nodoMap.values().stream()
                 .filter(s -> s.getResponsibleJobRoleId() != null)
-                .map(WorkflowStage::getResponsibleJobRoleId)
+                .map(WorkflowNodo::getResponsibleJobRoleId)
                 .collect(Collectors.toSet());
         Map<String, String> roleNameMap = jobRoleRepo.findAllById(roleIds).stream()
                 .collect(Collectors.toMap(JobRole::getId, JobRole::getName));
 
         Set<String> currentHistoryIds = new LinkedHashSet<>();
-        Set<String> pendingActiveStageIds = new LinkedHashSet<>(activeStageIds);
+        Set<String> pendingActiveNodoIds = new LinkedHashSet<>(activeNodoIds);
         for (int index = history.size() - 1; index >= 0; index--) {
             HistorialTramite historyEntry = history.get(index);
-            String stageId = historyEntry.getToStageId();
-            if (stageId != null && pendingActiveStageIds.remove(stageId)) {
+            String nodoId = historyEntry.getToNodoId();
+            if (nodoId != null && pendingActiveNodoIds.remove(nodoId)) {
                 currentHistoryIds.add(historyEntry.getId());
             }
-            if (pendingActiveStageIds.isEmpty()) break;
+            if (pendingActiveNodoIds.isEmpty()) break;
         }
 
-        Set<String> coveredStageIds = new java.util.HashSet<>();
+        Set<String> coveredNodoIds = new java.util.HashSet<>();
         List<Map<String, Object>> enrichedHistory = new ArrayList<>();
         for (HistorialTramite h : history) {
-            WorkflowStage stage = h.getToStageId() != null ? stageMap.get(h.getToStageId()) : null;
-            if (stage != null && isPassThroughNode(stage)
+            WorkflowNodo nodo = h.getToNodoId() != null ? nodoMap.get(h.getToNodoId()) : null;
+            if (nodo != null && isPassThroughNode(nodo)
                     && ("AVANZADO".equals(h.getAction()) || "UNION_COMPLETADA".equals(h.getAction()))) {
                 continue;
             }
-            if (h.getToStageId() != null) coveredStageIds.add(h.getToStageId());
+            if (h.getToNodoId() != null) coveredNodoIds.add(h.getToNodoId());
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("id", h.getId());
             entry.put("action", h.getAction());
-            entry.put("fromStageId", h.getFromStageId());
-            entry.put("toStageId", h.getToStageId());
+            entry.put("fromNodoId", h.getFromNodoId());
+            entry.put("toNodoId", h.getToNodoId());
             entry.put("comment", h.getComment());
             entry.put("changedAt", h.getChangedAt());
-            entry.put("stageName", stage != null ? stage.getName() : null);
-            entry.put("nodeType", stage != null ? stage.getNodeType() : null);
-            entry.put("departmentName", stage != null && stage.getResponsibleDepartmentId() != null
-                    ? deptNameMap.get(stage.getResponsibleDepartmentId()) : null);
-            entry.put("jobRoleName", stage != null && stage.getResponsibleJobRoleId() != null
-                    ? roleNameMap.get(stage.getResponsibleJobRoleId()) : null);
+            entry.put("nodoName", nodo != null ? nodo.getName() : null);
+            entry.put("nodeType", nodo != null ? nodo.getNodeType() : null);
+            entry.put("departmentName", nodo != null && nodo.getResponsibleDepartmentId() != null
+                    ? deptNameMap.get(nodo.getResponsibleDepartmentId()) : null);
+            entry.put("jobRoleName", nodo != null && nodo.getResponsibleJobRoleId() != null
+                    ? roleNameMap.get(nodo.getResponsibleJobRoleId()) : null);
             entry.put("isCurrent", currentHistoryIds.contains(h.getId()));
             enrichedHistory.add(entry);
         }
 
         for (Tramite clone : activeClones) {
-            String cloneStageId = clone.getCurrentStageId();
-            if (coveredStageIds.contains(cloneStageId)) continue;
-            WorkflowStage stage = stageMap.get(cloneStageId);
+            String cloneNodoId = clone.getCurrentNodoId();
+            if (coveredNodoIds.contains(cloneNodoId)) continue;
+            WorkflowNodo nodo = nodoMap.get(cloneNodoId);
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("id", "branch-" + clone.getId());
             entry.put("action", "AVANZADO");
-            entry.put("fromStageId", null);
-            entry.put("toStageId", cloneStageId);
+            entry.put("fromNodoId", null);
+            entry.put("toNodoId", cloneNodoId);
             entry.put("comment", "Rama paralela en curso");
             entry.put("changedAt", clone.getUpdatedAt() != null ? clone.getUpdatedAt() : clone.getCreatedAt());
-            entry.put("stageName", stage != null ? stage.getName() : null);
-            entry.put("nodeType", stage != null ? stage.getNodeType() : null);
-            entry.put("departmentName", stage != null && stage.getResponsibleDepartmentId() != null
-                    ? deptNameMap.get(stage.getResponsibleDepartmentId()) : null);
-            entry.put("jobRoleName", stage != null && stage.getResponsibleJobRoleId() != null
-                    ? roleNameMap.get(stage.getResponsibleJobRoleId()) : null);
+            entry.put("nodoName", nodo != null ? nodo.getName() : null);
+            entry.put("nodeType", nodo != null ? nodo.getNodeType() : null);
+            entry.put("departmentName", nodo != null && nodo.getResponsibleDepartmentId() != null
+                    ? deptNameMap.get(nodo.getResponsibleDepartmentId()) : null);
+            entry.put("jobRoleName", nodo != null && nodo.getResponsibleJobRoleId() != null
+                    ? roleNameMap.get(nodo.getResponsibleJobRoleId()) : null);
             entry.put("isCurrent", true);
             enrichedHistory.add(entry);
-            coveredStageIds.add(cloneStageId);
+            coveredNodoIds.add(cloneNodoId);
         }
 
         Map<String, Object> map = new LinkedHashMap<>();
@@ -179,7 +180,7 @@ public class TramiteService {
         map.put("description", tramite.getDescription());
         map.put("status", tramite.getStatus());
         map.put("workflowId", tramite.getWorkflowId());
-        map.put("currentStageId", tramite.getCurrentStageId());
+        map.put("currentNodoId", tramite.getCurrentNodoId());
         map.put("requestedById", tramite.getRequestedById());
         map.put("assignedUserId", tramite.getAssignedUserId());
         map.put("formData", tramite.getFormData());
@@ -196,21 +197,21 @@ public class TramiteService {
         Map<String, Workflow> workflowMap = workflowRepo.findAllById(workflowIds).stream()
                 .collect(Collectors.toMap(Workflow::getId, workflow -> workflow));
 
-        Set<String> stageIds = tramites.stream().map(Tramite::getCurrentStageId).filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<String, WorkflowStage> stageMap = stageRepo.findAllById(stageIds).stream()
-                .collect(Collectors.toMap(WorkflowStage::getId, stage -> stage));
+        Set<String> nodoIds = tramites.stream().map(Tramite::getCurrentNodoId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<String, WorkflowNodo> nodoMap = nodoRepo.findAllById(nodoIds).stream()
+                .collect(Collectors.toMap(WorkflowNodo::getId, nodo -> nodo));
 
         return tramites.stream()
                 .filter(tramite -> tramite.getStatus() != Tramite.Status.COMPLETADO && tramite.getStatus() != Tramite.Status.RECHAZADO)
                 .map(tramite -> Map.entry(tramite, workflowMap.get(tramite.getWorkflowId())))
                 .filter(entry -> entry.getValue() != null && hasWorkflowAccess(actor, entry.getValue()))
-                .map(entry -> Map.entry(entry.getKey(), stageMap.get(entry.getKey().getCurrentStageId())))
+                .map(entry -> Map.entry(entry.getKey(), nodoMap.get(entry.getKey().getCurrentNodoId())))
                 .filter(entry -> entry.getValue() != null
                         && !isPassThroughNode(entry.getValue())
-                        && matchesStageResponsibility(entry.getValue(), actor))
+                        && matchesNodoResponsibility(entry.getValue(), actor))
                 .map(entry -> {
                     Tramite tramite = entry.getKey();
-                    WorkflowStage stage = entry.getValue();
+                    WorkflowNodo nodo = entry.getValue();
                     Workflow workflow = workflowMap.get(tramite.getWorkflowId());
                     Map<String, Object> map = new LinkedHashMap<>();
                     map.put("id", tramite.getId());
@@ -219,8 +220,8 @@ public class TramiteService {
                     map.put("status", tramite.getStatus());
                     map.put("workflowId", workflow.getId());
                     map.put("workflowName", workflow.getName());
-                    map.put("currentStageId", stage.getId());
-                    map.put("currentStageName", stage.getName());
+                    map.put("currentNodoId", nodo.getId());
+                    map.put("currentNodoName", nodo.getName());
                     map.put("createdAt", tramite.getCreatedAt());
                     map.put("updatedAt", tramite.getUpdatedAt());
                     return map;
@@ -236,14 +237,14 @@ public class TramiteService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta actividad");
         }
 
-        WorkflowStage currentStage = stageRepo.findById(tramite.getCurrentStageId()).orElse(null);
-        if (currentStage == null || isPassThroughNode(currentStage) || !matchesStageResponsibility(currentStage, actor)) {
+        WorkflowNodo currentNodo = nodoRepo.findById(tramite.getCurrentNodoId()).orElse(null);
+        if (currentNodo == null || isPassThroughNode(currentNodo) || !matchesNodoResponsibility(currentNodo, actor)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta actividad");
         }
 
         List<HistorialTramite> history = historyRepo.findByTramiteIdOrderByChangedAtAsc(tramite.getId());
         List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflow.getId());
-        FormDefinition formDefinition = formRepo.findByStageId(currentStage.getId()).orElse(null);
+        FormDefinition formDefinition = formRepo.findByNodoId(currentNodo.getId()).orElse(null);
 
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", tramite.getId());
@@ -253,15 +254,15 @@ public class TramiteService {
         map.put("status", tramite.getStatus());
         map.put("workflowId", workflow.getId());
         map.put("workflowName", workflow.getName());
-        map.put("currentStageId", currentStage.getId());
-        map.put("currentStageName", currentStage.getName());
+        map.put("currentNodoId", currentNodo.getId());
+        map.put("currentNodoName", currentNodo.getName());
         map.put("formData", tramite.getFormData());
         map.put("createdAt", tramite.getCreatedAt());
         map.put("updatedAt", tramite.getUpdatedAt());
         map.put("history", history);
         map.put("formDefinition", formDefinition);
-        map.put("availableTransitions", buildAvailableTransitions(currentStage, transitions));
-        map.put("incomingData", buildIncomingData(tramite, currentStage, transitions));
+        map.put("availableTransitions", buildAvailableTransitions(currentNodo, transitions));
+        map.put("incomingData", buildIncomingData(tramite, currentNodo, transitions));
         return map;
     }
 
@@ -295,21 +296,21 @@ public class TramiteService {
         Workflow workflow = workflowRepo.findById((String) body.get("workflowId"))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Workflow no encontrado"));
 
-        List<WorkflowStage> stages = stageRepo.findByWorkflowIdOrderByOrderAsc(workflow.getId());
-        if (stages.isEmpty()) {
+        List<WorkflowNodo> nodos = nodoRepo.findByWorkflowIdOrderByOrderAsc(workflow.getId());
+        if (nodos.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El workflow no tiene etapas");
         }
-        WorkflowStage initialStage = stages.stream()
-                .filter(stage -> "start".equalsIgnoreCase(stage.getNodeType()))
+        WorkflowNodo initialNodo = nodos.stream()
+                .filter(nodo -> "inicio".equalsIgnoreCase(nodo.getNodeType()))
                 .findFirst()
-                .orElse(stages.get(0));
+                .orElse(nodos.get(0));
 
         Tramite tramite = new Tramite();
         tramite.setCode(generateCode());
         tramite.setTitle((String) body.get("title"));
         tramite.setDescription((String) body.get("description"));
         tramite.setWorkflowId(workflow.getId());
-        tramite.setCurrentStageId(initialStage.getId());
+        tramite.setCurrentNodoId(initialNodo.getId());
         tramite.setRequestedById(requestedById);
         tramite.setStatus(Tramite.Status.PENDIENTE);
 
@@ -318,12 +319,39 @@ public class TramiteService {
         tramite.setFormData(new LinkedHashMap<>(formData));
 
         Tramite saved = tramiteRepo.save(tramite);
-        recordHistory(saved.getId(), null, initialStage.getId(), "CREADO", requestedById, "Tramite creado");
+        recordHistory(saved.getId(), null, initialNodo.getId(), "CREADO", requestedById, "Tramite creado");
         return saved;
     }
 
     public Map<String, Object> advance(String id, Map<String, Object> body, String userId) {
         return advanceInternal(id, body, userId, true);
+    }
+
+    public Map<String, Object> parseVoiceFill(String id, Map<String, Object> body, User actor) {
+        Tramite tramite = tramiteRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Actividad no encontrada"));
+        Workflow workflow = workflowRepo.findById(tramite.getWorkflowId()).orElse(null);
+        if (workflow == null || !hasWorkflowAccess(actor, workflow)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta actividad");
+        }
+
+        WorkflowNodo currentNodo = nodoRepo.findById(tramite.getCurrentNodoId()).orElse(null);
+        if (currentNodo == null || isPassThroughNode(currentNodo) || !matchesNodoResponsibility(currentNodo, actor)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta actividad");
+        }
+
+        String transcript = String.valueOf(body.getOrDefault("transcript", "")).trim();
+        if (transcript.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes enviar el texto reconocido");
+        }
+
+        FormDefinition formDefinition = formRepo.findByNodoId(currentNodo.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La actividad actual no tiene formulario"));
+
+        Map<String, Object> result = voiceFormFillService.parseTranscript(transcript, formDefinition, tramite.getFormData());
+        result.put("activityId", tramite.getId());
+        result.put("currentNodoId", currentNodo.getId());
+        return result;
     }
 
     private Map<String, Object> advanceInternal(String id, Map<String, Object> body, String userId, boolean publishReports) {
@@ -336,56 +364,56 @@ public class TramiteService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transicion no encontrada"));
         List<WorkflowTransition> workflowTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(tramite.getWorkflowId());
 
-        if (!transition.getFromStageId().equals(tramite.getCurrentStageId())) {
+        if (!transition.getFromNodoId().equals(tramite.getCurrentNodoId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transicion invalida para la etapa actual");
         }
 
-        String previousStageId = tramite.getCurrentStageId();
+        String previousNodoId = tramite.getCurrentNodoId();
         WorkflowTransition finalTransition = transition;
-        WorkflowStage passThroughStage = stageRepo.findById(transition.getToStageId()).orElse(null);
-        WorkflowStage toStage = passThroughStage;
+        WorkflowNodo passThroughNodo = nodoRepo.findById(transition.getToNodoId()).orElse(null);
+        WorkflowNodo toNodo = passThroughNodo;
         String bifurcasionPassthroughId = null;
         String transitionHistoryAction = "AVANZADO";
         int transitionPathIndex = 1;
-        while (toStage != null) {
-            if (hasNodeType(toStage, "decision", "loop")) {
+        while (toNodo != null) {
+            if (hasNodeType(toNodo, "decision", "iteracion")) {
                 if (transitionPath.length <= transitionPathIndex) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes elegir una rama de la decision");
                 }
-                passThroughStage = toStage;
+                passThroughNodo = toNodo;
                 finalTransition = transitionRepo.findById(transitionPath[transitionPathIndex])
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision no encontrada"));
                 transitionPathIndex++;
-                if (!passThroughStage.getId().equals(finalTransition.getFromStageId())) {
+                if (!passThroughNodo.getId().equals(finalTransition.getFromNodoId())) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rama de decision invalida");
                 }
-                if (hasNodeType(passThroughStage, "loop")) {
+                if (hasNodeType(passThroughNodo, "iteracion")) {
                     transitionHistoryAction = resolveLoopHistoryAction(finalTransition);
-                } else if (hasNodeType(passThroughStage, "decision")
-                        && "reject".equals(resolveBranchOutcome(passThroughStage, finalTransition))) {
+                } else if (hasNodeType(passThroughNodo, "decision")
+                        && "rechazo".equals(resolveBranchOutcome(passThroughNodo, finalTransition))) {
                     transitionHistoryAction = "DECISION_RECHAZADA";
                 }
-                toStage = stageRepo.findById(finalTransition.getToStageId()).orElse(null);
+                toNodo = nodoRepo.findById(finalTransition.getToNodoId()).orElse(null);
                 continue;
             }
-            if (hasNodeType(toStage, "bifurcasion")) {
-                bifurcasionPassthroughId = toStage.getId();
-                final String bifurcasionId = toStage.getId();
+            if (hasNodeType(toNodo, "bifurcasion")) {
+                bifurcasionPassthroughId = toNodo.getId();
+                final String bifurcasionId = toNodo.getId();
                 WorkflowTransition firstBranch = workflowTransitions.stream()
-                    .filter(t -> bifurcasionId.equals(t.getFromStageId()))
+                    .filter(t -> bifurcasionId.equals(t.getFromNodoId()))
                     .findFirst().orElse(null);
                 if (firstBranch == null) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La bifurcacion no tiene ramas configuradas");
                 }
                 finalTransition = firstBranch;
-                toStage = stageRepo.findById(firstBranch.getToStageId()).orElse(null);
+                toNodo = nodoRepo.findById(firstBranch.getToNodoId()).orElse(null);
                 continue;
             }
             break;
         }
 
-        tramite.setCurrentStageId(finalTransition.getToStageId());
-        boolean isFinal = toStage != null && "END".equalsIgnoreCase(toStage.getNodeType());
+        tramite.setCurrentNodoId(finalTransition.getToNodoId());
+        boolean isFinal = toNodo != null && "fin".equalsIgnoreCase(toNodo.getNodeType());
         tramite.setStatus(isFinal ? Tramite.Status.COMPLETADO : Tramite.Status.EN_PROGRESO);
 
         @SuppressWarnings("unchecked")
@@ -399,21 +427,21 @@ public class TramiteService {
 
         String comment = (String) body.getOrDefault("comment", "");
         Tramite saved = tramiteRepo.save(tramite);
-        String resolvedFromStageId = passThroughStage != null && isPassThroughNode(passThroughStage)
-                ? passThroughStage.getId()
-                : previousStageId;
+        String resolvedFromNodoId = passThroughNodo != null && isPassThroughNode(passThroughNodo)
+                ? passThroughNodo.getId()
+                : previousNodoId;
         boolean recordsEvaluationAndAdvance = "DECISION_RECHAZADA".equals(transitionHistoryAction)
                 || "LOOP_RECHAZADO".equals(transitionHistoryAction)
                 || "LOOP_APROBADO".equals(transitionHistoryAction)
                 || "LOOP_EVALUADO".equals(transitionHistoryAction);
         if (recordsEvaluationAndAdvance) {
-            recordHistory(saved.getId(), previousStageId, previousStageId, transitionHistoryAction, userId, comment);
-            recordHistory(saved.getId(), resolvedFromStageId, finalTransition.getToStageId(), "AVANZADO", userId, comment);
+            recordHistory(saved.getId(), previousNodoId, previousNodoId, transitionHistoryAction, userId, comment);
+            recordHistory(saved.getId(), resolvedFromNodoId, finalTransition.getToNodoId(), "AVANZADO", userId, comment);
         } else {
             recordHistory(
                     saved.getId(),
-                    resolvedFromStageId,
-                    finalTransition.getToStageId(),
+                    resolvedFromNodoId,
+                    finalTransition.getToNodoId(),
                     transitionHistoryAction,
                     userId,
                     comment
@@ -424,11 +452,11 @@ public class TramiteService {
                     "Tu trámite " + saved.getCode() + " ha sido completado exitosamente.");
         }
 
-        String fromStageForBifurcasion = bifurcasionPassthroughId != null ? bifurcasionPassthroughId : previousStageId;
-        handleBifurcasionSplitIfNeeded(saved, fromStageForBifurcasion, finalTransition.getId(), userId);
+        String fromNodoForBifurcasion = bifurcasionPassthroughId != null ? bifurcasionPassthroughId : previousNodoId;
+        handleBifurcasionSplitIfNeeded(saved, fromNodoForBifurcasion, finalTransition.getId(), userId);
 
-        if (hasNodeType(toStage, "join")) {
-            handleJoinSyncIfNeeded(saved, toStage, userId);
+        if (hasNodeType(toNodo, "union")) {
+            handleJoinSyncIfNeeded(saved, toNodo, userId);
         }
 
         if (publishReports) {
@@ -441,13 +469,13 @@ public class TramiteService {
         return findOne(responseTramiteId);
     }
 
-    private void handleBifurcasionSplitIfNeeded(Tramite tramite, String fromStageId, String usedTransitionId, String userId) {
-        WorkflowStage fromStage = stageRepo.findById(fromStageId).orElse(null);
-        if (fromStage == null || !hasNodeType(fromStage, "bifurcasion")) return;
+    private void handleBifurcasionSplitIfNeeded(Tramite tramite, String fromNodoId, String usedTransitionId, String userId) {
+        WorkflowNodo fromNodo = nodoRepo.findById(fromNodoId).orElse(null);
+        if (fromNodo == null || !hasNodeType(fromNodo, "bifurcasion")) return;
 
         List<WorkflowTransition> allTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(tramite.getWorkflowId());
         List<WorkflowTransition> otherBranches = allTransitions.stream()
-                .filter(t -> fromStageId.equals(t.getFromStageId()) && !usedTransitionId.equals(t.getId()))
+                .filter(t -> fromNodoId.equals(t.getFromNodoId()) && !usedTransitionId.equals(t.getId()))
                 .toList();
 
         for (WorkflowTransition branch : otherBranches) {
@@ -456,7 +484,7 @@ public class TramiteService {
             clone.setTitle(tramite.getTitle());
             clone.setDescription(tramite.getDescription());
             clone.setWorkflowId(tramite.getWorkflowId());
-            clone.setCurrentStageId(branch.getToStageId());
+            clone.setCurrentNodoId(branch.getToNodoId());
             clone.setRequestedById(tramite.getRequestedById());
             clone.setAssignedUserId(tramite.getAssignedUserId());
             clone.setStatus(Tramite.Status.EN_PROGRESO);
@@ -465,9 +493,9 @@ public class TramiteService {
             if (tramite.getFormData() != null) clone.setFormData(new LinkedHashMap<>(tramite.getFormData()));
 
             Tramite savedClone = tramiteRepo.save(clone);
-            recordHistory(savedClone.getId(), fromStageId, branch.getToStageId(),
-                    "BIFURCACION", userId, "Rama creada por bifurcacion desde " + fromStage.getName());
-            recordHistory(rootId, fromStageId, branch.getToStageId(), "AVANZADO", userId, "Rama paralela en curso");
+            recordHistory(savedClone.getId(), fromNodoId, branch.getToNodoId(),
+                    "BIFURCACION", userId, "Rama creada por bifurcacion desde " + fromNodo.getName());
+            recordHistory(rootId, fromNodoId, branch.getToNodoId(), "AVANZADO", userId, "Rama paralela en curso");
         }
     }
 
@@ -477,7 +505,7 @@ public class TramiteService {
         tramite.setStatus(Tramite.Status.RECHAZADO);
         Tramite saved = tramiteRepo.save(tramite);
         String reason = (String) body.getOrDefault("reason", "Rechazado");
-        recordHistory(saved.getId(), tramite.getCurrentStageId(), null, "RECHAZADO", userId, reason);
+        recordHistory(saved.getId(), tramite.getCurrentNodoId(), null, "RECHAZADO", userId, reason);
         sendStatusNotification(saved, "Trámite rechazado", "Tu trámite " + saved.getCode() + " ha sido rechazado.");
         reportRealtimeService.scheduleDashboardUpdate();
         return saved;
@@ -494,20 +522,20 @@ public class TramiteService {
     }
 
     private String findEmailFromTramite(Tramite tramite) {
-        List<WorkflowStage> stages = stageRepo.findByWorkflowIdOrderByOrderAsc(tramite.getWorkflowId());
-        WorkflowStage startStage = stages.stream()
-                .filter(s -> "start".equalsIgnoreCase(s.getNodeType()))
+        List<WorkflowNodo> nodo = nodoRepo.findByWorkflowIdOrderByOrderAsc(tramite.getWorkflowId());
+        WorkflowNodo nodoInicio = nodo.stream()
+                .filter(s -> "inicio".equalsIgnoreCase(s.getNodeType()))
                 .findFirst()
-                .orElse(stages.isEmpty() ? null : stages.get(0));
-        if (startStage == null) return null;
+                .orElse(nodo.isEmpty() ? null : nodo.get(0));
+        if (nodoInicio == null) return null;
 
         List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(tramite.getWorkflowId());
-        WorkflowTransition fromStart = transitions.stream()
-                .filter(t -> startStage.getId().equals(t.getFromStageId()))
+        WorkflowTransition transicionInicio = transitions.stream()
+                .filter(t -> nodoInicio.getId().equals(t.getFromNodoId()))
                 .findFirst().orElse(null);
-        if (fromStart == null) return null;
+        if (transicionInicio == null) return null;
 
-        FormDefinition form = formRepo.findByStageId(fromStart.getToStageId()).orElse(null);
+        FormDefinition form = formRepo.findByNodoId(transicionInicio.getToNodoId()).orElse(null);
         if (form == null || form.getFields() == null) return null;
 
         FormDefinition.FormField emailField = form.getFields().stream()
@@ -525,39 +553,39 @@ public class TramiteService {
         return "TRM" + String.format("%05d", count);
     }
 
-    private void recordHistory(String tramiteId, String fromStageId, String toStageId,
+    private void recordHistory(String tramiteId, String fromNodoId, String toNodoId,
                                String action, String changedById, String comment) {
         HistorialTramite history = new HistorialTramite();
         history.setTramiteId(tramiteId);
-        history.setFromStageId(fromStageId);
-        history.setToStageId(toStageId);
+        history.setFromNodoId(fromNodoId);
+        history.setToNodoId(toNodoId);
         history.setAction(action);
         history.setChangedById(changedById);
         history.setComment(comment);
         historyRepo.save(history);
     }
 
-    private List<Map<String, Object>> buildAvailableTransitions(WorkflowStage currentStage, List<WorkflowTransition> transitions) {
+    private List<Map<String, Object>> buildAvailableTransitions(WorkflowNodo currentNodo, List<WorkflowTransition> transitions) {
         List<Map<String, Object>> available = new ArrayList<>();
         for (WorkflowTransition transition : transitions) {
-            if (!currentStage.getId().equals(transition.getFromStageId())) continue;
-            WorkflowStage directTarget = stageRepo.findById(transition.getToStageId()).orElse(null);
-            if (hasNodeType(directTarget, "decision", "loop")) {
+            if (!currentNodo.getId().equals(transition.getFromNodoId())) continue;
+            WorkflowNodo directTarget = nodoRepo.findById(transition.getToNodoId()).orElse(null);
+            if (hasNodeType(directTarget, "decision", "iteracion")) {
                 for (WorkflowTransition branch : transitions) {
-                    if (!directTarget.getId().equals(branch.getFromStageId())) continue;
-                    WorkflowStage finalTarget = stageRepo.findById(branch.getToStageId()).orElse(null);
+                    if (!directTarget.getId().equals(branch.getFromNodoId())) continue;
+                    WorkflowNodo finalTarget = nodoRepo.findById(branch.getToNodoId()).orElse(null);
                     Map<String, Object> option = new LinkedHashMap<>();
                     option.put("id", transition.getId() + ">>" + branch.getId());
                     option.put("name", branch.getName());
                     option.put("label", branch.getName());
-                    option.put("fromStageId", transition.getFromStageId());
-                    option.put("toStageId", branch.getToStageId());
-                    option.put("decisionStageId", directTarget.getId());
-                    option.put("decisionStageName", directTarget.getName());
-                    option.put("decisionNodeType", directTarget.getNodeType());
-                    option.put("branchOutcome", resolveBranchOutcome(directTarget, branch));
-                    option.put("targetStageName", finalTarget != null ? finalTarget.getName() : branch.getToStageId());
-                    option.put("kind", "decision-branch");
+                    option.put("fromNodoId", transition.getFromNodoId());
+                    option.put("toNodoId", branch.getToNodoId());
+                    option.put("nodoDecisionId", directTarget.getId());
+                    option.put("nodoDecisionNombre", directTarget.getName());
+                    option.put("tipoNodoDecision", directTarget.getNodeType());
+                    option.put("resultadoRama", resolveBranchOutcome(directTarget, branch));
+                    option.put("targetNodoName", finalTarget != null ? finalTarget.getName() : branch.getToNodoId());
+                    option.put("tipo", "rama-decision");
                     available.add(option);
                 }
                 continue;
@@ -566,38 +594,38 @@ public class TramiteService {
             option.put("id", transition.getId());
             option.put("name", transition.getName());
             option.put("label", transition.getName());
-            option.put("fromStageId", transition.getFromStageId());
-            option.put("toStageId", transition.getToStageId());
-            option.put("targetStageName", directTarget != null ? directTarget.getName() : transition.getToStageId());
-            option.put("kind", "transition");
+            option.put("fromNodoId", transition.getFromNodoId());
+            option.put("toNodoId", transition.getToNodoId());
+            option.put("targetNodoName", directTarget != null ? directTarget.getName() : transition.getToNodoId());
+            option.put("tipo", "transicion");
             available.add(option);
         }
         return available;
     }
 
-    private List<Map<String, Object>> buildIncomingData(Tramite tramite, WorkflowStage currentStage, List<WorkflowTransition> transitions) {
+    private List<Map<String, Object>> buildIncomingData(Tramite tramite, WorkflowNodo currentNodo, List<WorkflowTransition> transitions) {
         Map<String, Object> tramiteData = tramite.getFormData() == null ? Map.of() : tramite.getFormData();
         List<Map<String, Object>> incomingData = new ArrayList<>();
         for (WorkflowTransition transition : transitions) {
-            if (!currentStage.getId().equals(transition.getToStageId())) continue;
-            WorkflowStage sourceStage = stageRepo.findById(transition.getFromStageId()).orElse(null);
-            if (sourceStage == null) continue;
-            List<Map<String, Object>> fields = buildSharedFields(sourceStage, transition, tramiteData, transitions, new LinkedHashSet<>());
+            if (!currentNodo.getId().equals(transition.getToNodoId())) continue;
+            WorkflowNodo sourceNodo = nodoRepo.findById(transition.getFromNodoId()).orElse(null);
+            if (sourceNodo == null) continue;
+            List<Map<String, Object>> fields = buildSharedFields(sourceNodo, transition, tramiteData, transitions, new LinkedHashSet<>());
             if (fields.isEmpty()) continue;
             Map<String, Object> incoming = new LinkedHashMap<>();
             incoming.put("transitionId", transition.getId());
             incoming.put("transitionName", transition.getName());
-            incoming.put("fromStageName", sourceStage.getName());
+            incoming.put("fromNodoName", sourceNodo.getName());
             incoming.put("fields", fields);
             incomingData.add(incoming);
         }
         return incomingData;
     }
 
-    private List<Map<String, Object>> buildSharedFields(WorkflowStage sourceStage, WorkflowTransition transition,
+    private List<Map<String, Object>> buildSharedFields(WorkflowNodo sourceNodo, WorkflowTransition transition,
                                                         Map<String, Object> tramiteData,
-                                                        List<WorkflowTransition> transitions, Set<String> visitedStageIds) {
-        List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceStage, transitions, visitedStageIds);
+                                                        List<WorkflowTransition> transitions, Set<String> visitedNodoIds) {
+        List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceNodo, transitions, visitedNodoIds);
         Map<String, Object> forwardConfig = transition.getForwardConfig();
         String mode = resolveForwardMode(forwardConfig);
         Set<String> selectedFieldNames = resolveSelectedFields(forwardConfig);
@@ -618,26 +646,26 @@ public class TramiteService {
                 .toList();
     }
 
-    private List<FormDefinition.FormField> getForwardableFields(WorkflowStage stage, List<WorkflowTransition> transitions, Set<String> visitedStageIds) {
-        if (stage == null || stage.getId() == null || !visitedStageIds.add(stage.getId())) return List.of();
-        if (!isPassThroughNode(stage)) {
-            FormDefinition form = formRepo.findByStageId(stage.getId()).orElse(null);
+    private List<FormDefinition.FormField> getForwardableFields(WorkflowNodo nodo, List<WorkflowTransition> transitions, Set<String> visitedNodoIds) {
+        if (nodo == null || nodo.getId() == null || !visitedNodoIds.add(nodo.getId())) return List.of();
+        if (!isPassThroughNode(nodo)) {
+            FormDefinition form = formRepo.findByNodoId(nodo.getId()).orElse(null);
             if (form == null || form.getFields() == null) return List.of();
             return dedupeFields(form.getFields());
         }
         List<FormDefinition.FormField> aggregated = new ArrayList<>();
         for (WorkflowTransition incoming : transitions) {
-            if (!stage.getId().equals(incoming.getToStageId())) continue;
-            WorkflowStage upstreamStage = stageRepo.findById(incoming.getFromStageId()).orElse(null);
-            if (upstreamStage == null) continue;
-            aggregated.addAll(buildForwardedFieldDefinitions(upstreamStage, incoming, transitions, new LinkedHashSet<>(visitedStageIds)));
+            if (!nodo.getId().equals(incoming.getToNodoId())) continue;
+            WorkflowNodo upstreamNodo = nodoRepo.findById(incoming.getFromNodoId()).orElse(null);
+            if (upstreamNodo == null) continue;
+            aggregated.addAll(buildForwardedFieldDefinitions(upstreamNodo, incoming, transitions, new LinkedHashSet<>(visitedNodoIds)));
         }
         return dedupeFields(aggregated);
     }
 
-    private List<FormDefinition.FormField> buildForwardedFieldDefinitions(WorkflowStage sourceStage, WorkflowTransition transition,
-                                                                          List<WorkflowTransition> transitions, Set<String> visitedStageIds) {
-        List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceStage, transitions, visitedStageIds);
+    private List<FormDefinition.FormField> buildForwardedFieldDefinitions(WorkflowNodo sourceNodo, WorkflowTransition transition,
+                                                                          List<WorkflowTransition> transitions, Set<String> visitedNodoIds) {
+        List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceNodo, transitions, visitedNodoIds);
         Map<String, Object> forwardConfig = transition.getForwardConfig();
         return sourceFields.stream()
                 .filter(field -> shouldIncludeField(field, resolveForwardMode(forwardConfig), resolveSelectedFields(forwardConfig)))
@@ -675,29 +703,29 @@ public class TramiteService {
         return actor.getCompanyId() != null && actor.getCompanyId().equals(workflow.getCompanyId());
     }
 
-    private boolean matchesStageResponsibility(WorkflowStage stage, User actor) {
-        boolean hasJobRole = stage.getResponsibleJobRoleId() != null && !stage.getResponsibleJobRoleId().isBlank();
-        boolean hasDepartment = stage.getResponsibleDepartmentId() != null && !stage.getResponsibleDepartmentId().isBlank();
-        boolean hasRole = stage.getResponsibleRole() != null;
+    private boolean matchesNodoResponsibility(WorkflowNodo nodo, User actor) {
+        boolean hasJobRole = nodo.getResponsibleJobRoleId() != null && !nodo.getResponsibleJobRoleId().isBlank();
+        boolean hasDepartment = nodo.getResponsibleDepartmentId() != null && !nodo.getResponsibleDepartmentId().isBlank();
+        boolean hasRole = nodo.getResponsibleRole() != null;
 
         if (hasJobRole) {
-            boolean matchesJobRole = stage.getResponsibleJobRoleId().equals(actor.getJobRoleId());
+            boolean matchesJobRole = nodo.getResponsibleJobRoleId().equals(actor.getJobRoleId());
             if (!matchesJobRole) return false;
-            return !hasDepartment || (actor.getDepartmentId() != null && actor.getDepartmentId().equals(stage.getResponsibleDepartmentId()));
+            return !hasDepartment || (actor.getDepartmentId() != null && actor.getDepartmentId().equals(nodo.getResponsibleDepartmentId()));
         }
         if (hasDepartment) {
-            return actor.getDepartmentId() != null && actor.getDepartmentId().equals(stage.getResponsibleDepartmentId());
+            return actor.getDepartmentId() != null && actor.getDepartmentId().equals(nodo.getResponsibleDepartmentId());
         }
         if (hasRole) {
-            return actor.getRole() == stage.getResponsibleRole();
+            return actor.getRole() == nodo.getResponsibleRole();
         }
         return false;
     }
 
-    private void handleJoinSyncIfNeeded(Tramite tramite, WorkflowStage joinStage, String userId) {
+    private void handleJoinSyncIfNeeded(Tramite tramite, WorkflowNodo joinNodo, String userId) {
         List<WorkflowTransition> allTransitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(tramite.getWorkflowId());
         long expectedBranches = allTransitions.stream()
-                .filter(t -> joinStage.getId().equals(t.getToStageId()))
+                .filter(t -> joinNodo.getId().equals(t.getToNodoId()))
                 .count();
 
         String rootId = tramite.getParentTramiteId() != null ? tramite.getParentTramiteId() : tramite.getId();
@@ -705,8 +733,8 @@ public class TramiteService {
         if (root == null) return;
 
         List<Tramite> clones = tramiteRepo.findByParentTramiteId(rootId);
-        long arrivedCount = (joinStage.getId().equals(root.getCurrentStageId()) ? 1 : 0)
-                + clones.stream().filter(c -> joinStage.getId().equals(c.getCurrentStageId())).count();
+        long arrivedCount = (joinNodo.getId().equals(root.getCurrentNodoId()) ? 1 : 0)
+                + clones.stream().filter(c -> joinNodo.getId().equals(c.getCurrentNodoId())).count();
 
         if (arrivedCount < expectedBranches) return;
 
@@ -718,28 +746,28 @@ public class TramiteService {
         root.setFormData(merged);
 
         WorkflowTransition nextTransition = allTransitions.stream()
-                .filter(t -> joinStage.getId().equals(t.getFromStageId()))
+                .filter(t -> joinNodo.getId().equals(t.getFromNodoId()))
                 .findFirst().orElse(null);
 
         if (nextTransition != null) {
-            WorkflowStage nextStage = stageRepo.findById(nextTransition.getToStageId()).orElse(null);
-            boolean isFinal = nextStage != null && "END".equalsIgnoreCase(nextStage.getNodeType());
-            root.setCurrentStageId(nextTransition.getToStageId());
+            WorkflowNodo nextNodo = nodoRepo.findById(nextTransition.getToNodoId()).orElse(null);
+            boolean isFinal = nextNodo != null && "fin".equalsIgnoreCase(nextNodo.getNodeType());
+            root.setCurrentNodoId(nextTransition.getToNodoId());
             root.setStatus(isFinal ? Tramite.Status.COMPLETADO : Tramite.Status.EN_PROGRESO);
             tramiteRepo.save(root);
-            recordHistory(root.getId(), joinStage.getId(), nextTransition.getToStageId(), "UNION_COMPLETADA", userId, "Todas las ramas completadas");
+            recordHistory(root.getId(), joinNodo.getId(), nextTransition.getToNodoId(), "UNION_COMPLETADA", userId, "Todas las ramas completadas");
         }
 
         clones.forEach(clone -> tramiteRepo.deleteById(clone.getId()));
     }
 
-    private boolean isPassThroughNode(WorkflowStage stage) {
-        return hasNodeType(stage, "decision", "bifurcasion", "join", "loop");
+    private boolean isPassThroughNode(WorkflowNodo nodo) {
+        return hasNodeType(nodo, "decision", "bifurcasion", "union", "iteracion");
     }
 
-    private boolean hasNodeType(WorkflowStage stage, String... nodeTypes) {
-        if (stage == null || stage.getNodeType() == null) return false;
-        String value = stage.getNodeType().toLowerCase();
+    private boolean hasNodeType(WorkflowNodo nodo, String... nodeTypes) {
+        if (nodo == null || nodo.getNodeType() == null) return false;
+        String value = nodo.getNodeType().toLowerCase();
         for (String nodeType : nodeTypes) {
             if (value.equals(nodeType)) return true;
         }
@@ -753,15 +781,15 @@ public class TramiteService {
         return "LOOP_EVALUADO";
     }
 
-    private String resolveBranchOutcome(WorkflowStage decisionStage, WorkflowTransition branch) {
-        if (decisionStage == null || branch == null) return null;
+    private String resolveBranchOutcome(WorkflowNodo decisionNodo, WorkflowTransition branch) {
+        if (decisionNodo == null || branch == null) return null;
         String name = branch.getName() == null ? "" : branch.getName().trim().toLowerCase();
-        if (hasNodeType(decisionStage, "loop")) {
-            if (name.equals("repetir")) return "reject";
-            if (name.equals("salir")) return "accept";
-        } else if (hasNodeType(decisionStage, "decision")) {
-            if (name.equals("si") || name.equals("sí") || name.equals("aprobado") || name.equals("aceptado")) return "accept";
-            if (name.equals("no") || name.equals("rechazado") || name.equals("rechazar")) return "reject";
+        if (hasNodeType(decisionNodo, "iteracion")) {
+            if (name.equals("repetir")) return "rechazo";
+            if (name.equals("salir")) return "aceptacion";
+        } else if (hasNodeType(decisionNodo, "decision")) {
+            if (name.equals("si") || name.equals("sí") || name.equals("aprobado") || name.equals("aceptado")) return "aceptacion";
+            if (name.equals("no") || name.equals("rechazado") || name.equals("rechazar")) return "rechazo";
         }
         return null;
     }

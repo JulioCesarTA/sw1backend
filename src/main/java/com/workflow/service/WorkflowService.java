@@ -5,13 +5,13 @@ import com.workflow.model.Company;
 import com.workflow.model.Department;
 import com.workflow.model.User;
 import com.workflow.model.Workflow;
-import com.workflow.model.WorkflowStage;
+import com.workflow.model.WorkflowNodo;
 import com.workflow.model.WorkflowTransition;
 import com.workflow.repository.CompanyRepository;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.FormDefinitionRepository;
 import com.workflow.repository.WorkflowRepository;
-import com.workflow.repository.WorkflowStageRepository;
+import com.workflow.repository.WorkflowNodoRepository;
 import com.workflow.repository.WorkflowTransitionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 public class WorkflowService {
 
     private final WorkflowRepository workflowRepo;
-    private final WorkflowStageRepository stageRepo;
+    private final WorkflowNodoRepository nodoRepo;
     private final WorkflowTransitionRepository transitionRepo;
     private final FormDefinitionRepository formRepo;
     private final CompanyRepository companyRepo;
@@ -56,18 +56,18 @@ public class WorkflowService {
         Set<String> companyIds = workflows.stream().map(Workflow::getCompanyId).filter(id -> id != null && !id.isBlank()).collect(Collectors.toSet());
         Map<String, String> companyNames = companyRepo.findAllById(companyIds).stream()
                 .collect(Collectors.toMap(Company::getId, Company::getName));
-        Map<String, List<WorkflowStage>> stagesByWf = stageRepo.findByWorkflowIdIn(wfIds).stream()
-                .collect(Collectors.groupingBy(WorkflowStage::getWorkflowId));
+        Map<String, List<WorkflowNodo>> nodoByWf = nodoRepo.findByWorkflowIdIn(wfIds).stream()
+                .collect(Collectors.groupingBy(WorkflowNodo::getWorkflowId));
         return workflows.stream().map(wf -> {
-            List<WorkflowStage> stages = stagesByWf.getOrDefault(wf.getId(), List.of());
+            List<WorkflowNodo> nodo = nodoByWf.getOrDefault(wf.getId(), List.of());
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("id", wf.getId());
             map.put("name", wf.getName());
             map.put("description", wf.getDescription());
             map.put("companyId", wf.getCompanyId());
             map.put("companyName", wf.getCompanyId() != null ? companyNames.get(wf.getCompanyId()) : null);
-            map.put("stages", stages);
-            map.put("_count", Map.of("tramites", 0, "stages", stages.size()));
+            map.put("nodo", nodo);
+            map.put("_count", Map.of("tramites", 0, "nodo", nodo.size()));
             return map;
         }).toList();
     }
@@ -101,49 +101,49 @@ public class WorkflowService {
         return workflowRepo.save(workflow);
     }
 
-    public WorkflowStage createStage(Map<String, Object> body) {
+    public WorkflowNodo createNodo(Map<String, Object> body) {
         String workflowId = (String) body.get("workflowId");
         if (workflowId == null || workflowId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workflowId es obligatorio");
         }
 
-        WorkflowStage stage = new WorkflowStage();
-        applyStageFields(stage, body);
+        WorkflowNodo nodo = new WorkflowNodo();
+        applyNodoFields(nodo, body);
 
         Integer requestedOrder = extractRequestedOrder(body);
-        stage.setOrder(resolveCreateOrder(workflowId, requestedOrder));
+        nodo.setOrder(resolveCreateOrder(workflowId, requestedOrder));
 
         for (int attempt = 0; attempt < 20; attempt++) {
             try {
-                WorkflowStage saved = stageRepo.save(stage);
-                syncStageFormDefinition(saved, body);
+                WorkflowNodo saved = nodoRepo.save(nodo);
+                syncNodoFormDefinition(saved, body);
                 return saved;
             } catch (DuplicateKeyException ex) {
-                stage.setOrder(resolveCreateOrder(workflowId, stage.getOrder() + 1));
+                nodo.setOrder(resolveCreateOrder(workflowId, nodo.getOrder() + 1));
             }
         }
 
         throw new ResponseStatusException(HttpStatus.CONFLICT, "No se pudo asignar un orden disponible para la etapa");
     }
 
-    public WorkflowStage findStage(String id) {
-        return stageRepo.findById(id)
+    public WorkflowNodo findNodo(String id) {
+        return nodoRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Etapa no encontrada"));
     }
 
-    public WorkflowStage updateStage(String id, Map<String, Object> body) {
-        WorkflowStage stage = findStage(id);
-        applyStageFields(stage, body);
-        WorkflowStage saved = stageRepo.save(stage);
-        syncStageFormDefinition(saved, body);
+    public WorkflowNodo updateNodo(String id, Map<String, Object> body) {
+        WorkflowNodo nodo = findNodo(id);
+        applyNodoFields(nodo, body);
+        WorkflowNodo saved = nodoRepo.save(nodo);
+        syncNodoFormDefinition(saved, body);
         return saved;
     }
 
-    public void deleteStage(String id) {
-        findStage(id);
-        formRepo.findByStageId(id).ifPresent(formRepo::delete);
-        stageRepo.deleteById(id);
-        transitionRepo.deleteByFromStageIdOrToStageId(id, id);
+    public void deleteNodo(String id) {
+        findNodo(id);
+        formRepo.findByNodoId(id).ifPresent(formRepo::delete);
+        nodoRepo.deleteById(id);
+        transitionRepo.deleteByFromNodoIdOrToNodoId(id, id);
     }
 
     public WorkflowTransition createTransition(Map<String, Object> body) {
@@ -168,47 +168,47 @@ public class WorkflowService {
         transitionRepo.deleteById(id);
     }
 
-    private void applyStageFields(WorkflowStage stage, Map<String, Object> body) {
-        if (body.containsKey("workflowId")) stage.setWorkflowId((String) body.get("workflowId"));
-        if (body.containsKey("name")) stage.setName((String) body.get("name"));
-        if (body.containsKey("description")) stage.setDescription((String) body.get("description"));
-        if (stage.getId() != null && body.containsKey("order") && body.get("order") != null) {
-            stage.setOrder(((Number) body.get("order")).intValue());
+    private void applyNodoFields(WorkflowNodo nodo, Map<String, Object> body) {
+        if (body.containsKey("workflowId")) nodo.setWorkflowId((String) body.get("workflowId"));
+        if (body.containsKey("name")) nodo.setName((String) body.get("name"));
+        if (body.containsKey("description")) nodo.setDescription((String) body.get("description"));
+        if (nodo.getId() != null && body.containsKey("order") && body.get("order") != null) {
+            nodo.setOrder(((Number) body.get("order")).intValue());
         }
         if (body.containsKey("responsibleRole")) {
             Object responsibleRole = body.get("responsibleRole");
             if (responsibleRole == null || responsibleRole.toString().isBlank()) {
-                stage.setResponsibleRole(null);
+                nodo.setResponsibleRole(null);
             } else {
-                stage.setResponsibleRole(com.workflow.model.User.Role.valueOf(responsibleRole.toString().toUpperCase()));
+                nodo.setResponsibleRole(com.workflow.model.User.Role.valueOf(responsibleRole.toString().toUpperCase()));
             }
         }
-        if (body.containsKey("responsibleDepartmentId")) stage.setResponsibleDepartmentId((String) body.get("responsibleDepartmentId"));
-        if (body.containsKey("requiresForm")) stage.setRequiresForm(Boolean.TRUE.equals(body.get("requiresForm")));
+        if (body.containsKey("responsibleDepartmentId")) nodo.setResponsibleDepartmentId((String) body.get("responsibleDepartmentId"));
+        if (body.containsKey("requiresForm")) nodo.setRequiresForm(Boolean.TRUE.equals(body.get("requiresForm")));
         if (body.containsKey("avgHours") && body.get("avgHours") != null) {
-            stage.setAvgHours(((Number) body.get("avgHours")).intValue());
+            nodo.setAvgHours(((Number) body.get("avgHours")).intValue());
         }
-        if (body.containsKey("nodeType")) stage.setNodeType(normalizeNodeType((String) body.get("nodeType")));
+        if (body.containsKey("nodeType")) nodo.setNodeType(normalizarTipoNodo((String) body.get("nodeType")));
         if (body.containsKey("posX") && body.get("posX") != null) {
-            stage.setPosX(((Number) body.get("posX")).doubleValue());
+            nodo.setPosX(((Number) body.get("posX")).doubleValue());
         }
         if (body.containsKey("posY") && body.get("posY") != null) {
-            stage.setPosY(((Number) body.get("posY")).doubleValue());
+            nodo.setPosY(((Number) body.get("posY")).doubleValue());
         }
-        if (body.containsKey("responsibleJobRoleId")) stage.setResponsibleJobRoleId((String) body.get("responsibleJobRoleId"));
+        if (body.containsKey("responsibleJobRoleId")) nodo.setResponsibleJobRoleId((String) body.get("responsibleJobRoleId"));
     }
 
     @SuppressWarnings("unchecked")
-    private void syncStageFormDefinition(WorkflowStage stage, Map<String, Object> body) {
-        if (stage == null || stage.getId() == null) {
+    private void syncNodoFormDefinition(WorkflowNodo nodo, Map<String, Object> body) {
+        if (nodo == null || nodo.getId() == null) {
             return;
         }
 
-        boolean isProcessStage = "proceso".equalsIgnoreCase(stage.getNodeType()) || "process".equalsIgnoreCase(stage.getNodeType());
+        boolean isProcessNodo = "proceso".equalsIgnoreCase(nodo.getNodeType());
         boolean hasFormPayload = body.containsKey("formDefinition");
 
-        if (!isProcessStage || !stage.isRequiresForm()) {
-            formRepo.findByStageId(stage.getId()).ifPresent(formRepo::delete);
+        if (!isProcessNodo || !nodo.isRequiresForm()) {
+            formRepo.findByNodoId(nodo.getId()).ifPresent(formRepo::delete);
             return;
         }
 
@@ -218,12 +218,12 @@ public class WorkflowService {
 
         Object rawFormDefinition = body.get("formDefinition");
         if (!(rawFormDefinition instanceof Map<?, ?> rawFormMap)) {
-            formRepo.findByStageId(stage.getId()).ifPresent(formRepo::delete);
+            formRepo.findByNodoId(nodo.getId()).ifPresent(formRepo::delete);
             return;
         }
 
-        FormDefinition formDefinition = formRepo.findByStageId(stage.getId()).orElse(new FormDefinition());
-        formDefinition.setStageId(stage.getId());
+        FormDefinition formDefinition = formRepo.findByNodoId(nodo.getId()).orElse(new FormDefinition());
+        formDefinition.setNodoId(nodo.getId());
         Object rawTitle = rawFormMap.get("title");
         formDefinition.setTitle(rawTitle == null ? "Formulario" : String.valueOf(rawTitle));
         formDefinition.setFields(mapFormFields((List<Map<String, Object>>) rawFormMap.get("fields")));
@@ -268,16 +268,11 @@ public class WorkflowService {
         }
     }
 
-    private String normalizeNodeType(String rawNodeType) {
+    private String normalizarTipoNodo(String rawNodeType) {
         if (rawNodeType == null || rawNodeType.isBlank()) {
             return rawNodeType;
         }
-        return switch (rawNodeType.trim().toLowerCase()) {
-            case "process", "proceso" -> "proceso";
-            case "fork", "bifurcation", "bifurcasion" -> "bifurcasion";
-            case "union", "join" -> "join";
-            default -> rawNodeType.trim().toLowerCase();
-        };
+        return rawNodeType.trim().toLowerCase();
     }
 
     private Integer extractRequestedOrder(Map<String, Object> body) {
@@ -290,13 +285,13 @@ public class WorkflowService {
     }
 
     private int resolveCreateOrder(String workflowId, Integer requestedOrder) {
-        List<WorkflowStage> existingStages = stageRepo.findByWorkflowIdOrderByOrderAsc(workflowId);
+        List<WorkflowNodo> existingNodos = nodoRepo.findByWorkflowIdOrderByOrderAsc(workflowId);
         Set<Integer> usedOrders = new HashSet<>();
         int maxOrder = 0;
 
-        for (WorkflowStage existingStage : existingStages) {
-            usedOrders.add(existingStage.getOrder());
-            maxOrder = Math.max(maxOrder, existingStage.getOrder());
+        for (WorkflowNodo existingNodo : existingNodos) {
+            usedOrders.add(existingNodo.getOrder());
+            maxOrder = Math.max(maxOrder, existingNodo.getOrder());
         }
 
         int candidate = requestedOrder != null ? requestedOrder : (maxOrder + 1);
@@ -312,8 +307,8 @@ public class WorkflowService {
     @SuppressWarnings("unchecked")
     private void applyTransitionFields(WorkflowTransition transition, Map<String, Object> body) {
         if (body.containsKey("workflowId")) transition.setWorkflowId((String) body.get("workflowId"));
-        if (body.containsKey("fromStageId")) transition.setFromStageId((String) body.get("fromStageId"));
-        if (body.containsKey("toStageId")) transition.setToStageId((String) body.get("toStageId"));
+        if (body.containsKey("fromNodoId")) transition.setFromNodoId((String) body.get("fromNodoId"));
+        if (body.containsKey("toNodoId")) transition.setToNodoId((String) body.get("toNodoId"));
         if (body.containsKey("name")) transition.setName((String) body.getOrDefault("name", ""));
         if (body.containsKey("forwardConfig")) {
             Map<String, Object> raw = (Map<String, Object>) body.get("forwardConfig");
@@ -331,33 +326,33 @@ public class WorkflowService {
     }
 
     private Map<String, Object> enrichWorkflowFull(Workflow workflow) {
-        List<WorkflowStage> stages = stageRepo.findByWorkflowIdOrderByOrderAsc(workflow.getId());
+        List<WorkflowNodo> nodos = nodoRepo.findByWorkflowIdOrderByOrderAsc(workflow.getId());
         List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflow.getId());
         Company company = workflow.getCompanyId() != null ? companyRepo.findById(workflow.getCompanyId()).orElse(null) : null;
 
-        Set<String> deptIds = stages.stream().map(WorkflowStage::getResponsibleDepartmentId).filter(id -> id != null && !id.isBlank()).collect(Collectors.toSet());
+        Set<String> deptIds = nodos.stream().map(WorkflowNodo::getResponsibleDepartmentId).filter(id -> id != null && !id.isBlank()).collect(Collectors.toSet());
         Map<String, String> deptNames = departmentRepo.findAllById(deptIds).stream().collect(Collectors.toMap(Department::getId, Department::getName));
 
-        Set<String> stageIds = stages.stream().map(WorkflowStage::getId).collect(Collectors.toSet());
-        Map<String, FormDefinition> formByStage = formRepo.findByStageIdIn(stageIds).stream().collect(Collectors.toMap(FormDefinition::getStageId, f -> f));
+        Set<String> nodoIds = nodos.stream().map(WorkflowNodo::getId).collect(Collectors.toSet());
+        Map<String, FormDefinition> formByNodo = formRepo.findByNodoIdIn(nodoIds).stream().collect(Collectors.toMap(FormDefinition::getNodoId, f -> f));
 
-        List<Map<String, Object>> stagesMapped = stages.stream().map(stage -> {
+        List<Map<String, Object>> nodoMapped = nodos.stream().map(nodo -> {
             Map<String, Object> mapped = new LinkedHashMap<>();
-            mapped.put("id", stage.getId());
-            mapped.put("workflowId", stage.getWorkflowId());
-            mapped.put("name", stage.getName());
-            mapped.put("description", stage.getDescription());
-            mapped.put("order", stage.getOrder());
-            mapped.put("responsibleRole", stage.getResponsibleRole());
-            mapped.put("responsibleDepartmentId", stage.getResponsibleDepartmentId());
-            mapped.put("responsibleDepartmentName", stage.getResponsibleDepartmentId() != null ? deptNames.get(stage.getResponsibleDepartmentId()) : null);
-            mapped.put("requiresForm", stage.isRequiresForm());
-            mapped.put("avgHours", stage.getAvgHours());
-            mapped.put("nodeType", stage.getNodeType());
-            mapped.put("posX", stage.getPosX());
-            mapped.put("posY", stage.getPosY());
-            mapped.put("responsibleJobRoleId", stage.getResponsibleJobRoleId());
-            FormDefinition formDefinition = formByStage.get(stage.getId());
+            mapped.put("id", nodo.getId());
+            mapped.put("workflowId", nodo.getWorkflowId());
+            mapped.put("name", nodo.getName());
+            mapped.put("description", nodo.getDescription());
+            mapped.put("order", nodo.getOrder());
+            mapped.put("responsibleRole", nodo.getResponsibleRole());
+            mapped.put("responsibleDepartmentId", nodo.getResponsibleDepartmentId());
+            mapped.put("responsibleDepartmentName", nodo.getResponsibleDepartmentId() != null ? deptNames.get(nodo.getResponsibleDepartmentId()) : null);
+            mapped.put("requiresForm", nodo.isRequiresForm());
+            mapped.put("avgHours", nodo.getAvgHours());
+            mapped.put("nodeType", nodo.getNodeType());
+            mapped.put("posX", nodo.getPosX());
+            mapped.put("posY", nodo.getPosY());
+            mapped.put("responsibleJobRoleId", nodo.getResponsibleJobRoleId());
+            FormDefinition formDefinition = formByNodo.get(nodo.getId());
             if (formDefinition != null) mapped.put("formDefinition", formDefinition);
             return mapped;
         }).toList();
@@ -368,9 +363,9 @@ public class WorkflowService {
         map.put("description", workflow.getDescription());
         map.put("companyId", workflow.getCompanyId());
         map.put("companyName", company != null ? company.getName() : null);
-        map.put("stages", stagesMapped);
+        map.put("nodo", nodoMapped);
         map.put("transitions", transitions);
-        map.put("_count", Map.of("tramites", 0, "stages", stages.size()));
+        map.put("_count", Map.of("tramites", 0, "nodo", nodos.size()));
         return map;
     }
 

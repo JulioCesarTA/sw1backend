@@ -17,14 +17,14 @@ public class FormService {
 
     private final FormDefinitionRepository formRepo;
 
-    public Optional<FormDefinition> findByStageId(String stageId) {
-        return formRepo.findByStageId(stageId);
+    public Optional<FormDefinition> findByNodoId(String nodoId) {
+        return formRepo.findByNodoId(nodoId);
     }
 
     public FormDefinition upsert(Map<String, Object> body) {
-        String stageId = (String) body.get("stageId");
-        FormDefinition fd = formRepo.findByStageId(stageId).orElse(new FormDefinition());
-        fd.setStageId(stageId);
+        String nodoId = (String) body.get("nodoId");
+        FormDefinition fd = formRepo.findByNodoId(nodoId).orElse(new FormDefinition());
+        fd.setNodoId(nodoId);
         fd.setTitle((String) body.getOrDefault("title", "Formulario"));
 
         @SuppressWarnings("unchecked")
@@ -46,7 +46,7 @@ public class FormService {
         return formRepo.save(fd);
     }
 
-    public void deleteByStageId(String stageId) {
-        formRepo.findByStageId(stageId).ifPresent(formRepo::delete);
+    public void deleteByNodoId(String nodoId) {
+        formRepo.findByNodoId(nodoId).ifPresent(formRepo::delete);
     }
 }

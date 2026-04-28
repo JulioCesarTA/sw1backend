@@ -15,9 +15,9 @@ public class FormController {
 
     private final FormService formService;
 
-    @GetMapping("/stage/{stageId}")
-    public ResponseEntity<FormDefinition> findByStage(@PathVariable String stageId) {
-        return formService.findByStageId(stageId)
+    @GetMapping("/nodo/{nodoId}")
+    public ResponseEntity<FormDefinition> findByNodo(@PathVariable String nodoId) {
+        return formService.findByNodoId(nodoId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -27,9 +27,9 @@ public class FormController {
         return ResponseEntity.ok(formService.upsert(body));
     }
 
-    @DeleteMapping("/stage/{stageId}")
-    public ResponseEntity<Void> deleteByStage(@PathVariable String stageId) {
-        formService.deleteByStageId(stageId);
+    @DeleteMapping("/nodo/{nodoId}")
+    public ResponseEntity<Void> deleteByNodo(@PathVariable String nodoId) {
+        formService.deleteByNodoId(nodoId);
         return ResponseEntity.noContent().build();
     }
 }

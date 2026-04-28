@@ -1,6 +1,6 @@
 package com.workflow.controller;
 
-import com.workflow.model.WorkflowStage;
+import com.workflow.model.WorkflowNodo;
 import com.workflow.model.User;
 import com.workflow.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
@@ -13,23 +13,23 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/workflow-stages")
+@RequestMapping("/workflow-nodos")
 @RequiredArgsConstructor
-public class WorkflowStagesController {
+public class WorkflowNodosController {
 
     private final WorkflowService workflowService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping
-    public ResponseEntity<WorkflowStage> create(@RequestBody Map<String, Object> body,
-                                                @AuthenticationPrincipal User user) {
-        WorkflowStage created = workflowService.createStage(body);
+    public ResponseEntity<WorkflowNodo> create(@RequestBody Map<String, Object> body,
+                                               @AuthenticationPrincipal User user) {
+        WorkflowNodo created = workflowService.createNodo(body);
         messagingTemplate.convertAndSend(
                 "/topic/workflows/" + created.getWorkflowId() + "/collab",
                 Map.of(
-                        "type", "stage_created",
+                        "type", "nodo_created",
                         "workflowId", created.getWorkflowId(),
-                        "stage", created,
+                        "nodo", created,
                         "userId", user != null ? user.getId() : null
                 )
         );
@@ -37,15 +37,15 @@ public class WorkflowStagesController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<WorkflowStage> update(@PathVariable("id") String id, @RequestBody Map<String, Object> body,
-                                                @AuthenticationPrincipal User user) {
-        WorkflowStage updated = workflowService.updateStage(id, body);
+    public ResponseEntity<WorkflowNodo> update(@PathVariable("id") String id, @RequestBody Map<String, Object> body,
+                                               @AuthenticationPrincipal User user) {
+        WorkflowNodo updated = workflowService.updateNodo(id, body);
         messagingTemplate.convertAndSend(
                 "/topic/workflows/" + updated.getWorkflowId() + "/collab",
                 Map.of(
-                        "type", "stage_updated",
+                        "type", "nodo_updated",
                         "workflowId", updated.getWorkflowId(),
-                        "stage", updated,
+                        "nodo", updated,
                         "userId", user != null ? user.getId() : null
                 )
         );
@@ -54,14 +54,14 @@ public class WorkflowStagesController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> remove(@PathVariable("id") String id, @AuthenticationPrincipal User user) {
-        WorkflowStage stage = workflowService.findStage(id);
-        workflowService.deleteStage(id);
+        WorkflowNodo nodo = workflowService.findNodo(id);
+        workflowService.deleteNodo(id);
         messagingTemplate.convertAndSend(
-                "/topic/workflows/" + stage.getWorkflowId() + "/collab",
+                "/topic/workflows/" + nodo.getWorkflowId() + "/collab",
                 Map.of(
-                        "type", "stage_deleted",
-                        "workflowId", stage.getWorkflowId(),
-                        "stageId", stage.getId(),
+                        "type", "nodo_deleted",
+                        "workflowId", nodo.getWorkflowId(),
+                        "nodoId", nodo.getId(),
                         "userId", user != null ? user.getId() : null
                 )
         );

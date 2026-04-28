@@ -8,6 +8,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface FormDefinitionRepository extends MongoRepository<FormDefinition, String> {
-    Optional<FormDefinition> findByStageId(String stageId);
-    List<FormDefinition> findByStageIdIn(Collection<String> stageIds);
+    Optional<FormDefinition> findByNodoId(String nodoId);
+    List<FormDefinition> findByNodoIdIn(Collection<String> nodoIds);
 }

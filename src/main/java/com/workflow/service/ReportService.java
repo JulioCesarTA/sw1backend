@@ -4,12 +4,12 @@ import com.workflow.model.Department;
 import com.workflow.model.JobRole;
 import com.workflow.model.Tramite;
 import com.workflow.model.HistorialTramite;
-import com.workflow.model.WorkflowStage;
+import com.workflow.model.WorkflowNodo;
 import com.workflow.repository.TramiteRepository;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.JobRoleRepository;
 import com.workflow.repository.HistorialTramiteRepository;
-import com.workflow.repository.WorkflowStageRepository;
+import com.workflow.repository.WorkflowNodoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,18 +27,18 @@ public class ReportService {
 
     private final TramiteRepository tramiteRepo;
     private final HistorialTramiteRepository historialTramiteRepo;
-    private final WorkflowStageRepository workflowStageRepo;
+    private final WorkflowNodoRepository workflowNodoRepo;
     private final DepartmentRepository departmentRepo;
     private final JobRoleRepository jobRoleRepo;
 
     public Map<String, Object> getDashboardStats() {
         List<Tramite> tramites = tramiteRepo.findAll();
         List<HistorialTramite> histories = historialTramiteRepo.findByTramiteIdIn(tramites.stream().map(Tramite::getId).toList());
-        Set<String> stageIds = collectStageReferenceIds(histories.stream().map(HistorialTramite::getToStageId).toList());
-        Map<String, WorkflowStage> stagesById = workflowStageRepo.findAllById(stageIds).stream()
-                .collect(Collectors.toMap(WorkflowStage::getId, stage -> stage, (left, right) -> left));
-        Set<String> departmentIds = collectStageReferenceIds(stagesById.values().stream().map(WorkflowStage::getResponsibleDepartmentId).toList());
-        Set<String> jobRoleIds = collectStageReferenceIds(stagesById.values().stream().map(WorkflowStage::getResponsibleJobRoleId).toList());
+        Set<String> nodoIds = collectNodoReferenceIds(histories.stream().map(HistorialTramite::getToNodoId).toList());
+        Map<String, WorkflowNodo> nodoById = workflowNodoRepo.findAllById(nodoIds).stream()
+                .collect(Collectors.toMap(WorkflowNodo::getId, nodo -> nodo, (left, right) -> left));
+        Set<String> departmentIds = collectNodoReferenceIds(nodoById.values().stream().map(WorkflowNodo::getResponsibleDepartmentId).toList());
+        Set<String> jobRoleIds = collectNodoReferenceIds(nodoById.values().stream().map(WorkflowNodo::getResponsibleJobRoleId).toList());
         Map<String, String> departmentNames = departmentRepo.findAllById(departmentIds).stream()
                 .collect(Collectors.toMap(Department::getId, Department::getName));
         Map<String, String> jobRoleNames = jobRoleRepo.findAllById(jobRoleIds).stream()
@@ -49,13 +49,13 @@ public class ReportService {
         Map<String, Long> departmentFlow = new LinkedHashMap<>();
 
         for (HistorialTramite history : histories) {
-            String stageId = history.getToStageId();
-            if (stageId == null || stageId.isBlank()) continue;
-            WorkflowStage stage = stagesById.get(stageId);
-            if (stage == null) continue;
+            String nodoId = history.getToNodoId();
+            if (nodoId == null || nodoId.isBlank()) continue;
+            WorkflowNodo nodo = nodoById.get(nodoId);
+            if (nodo == null) continue;
 
-            String departmentId = stage.getResponsibleDepartmentId();
-            String jobRoleId = stage.getResponsibleJobRoleId();
+            String departmentId = nodo.getResponsibleDepartmentId();
+            String jobRoleId = nodo.getResponsibleJobRoleId();
             String departmentName = departmentNames.getOrDefault(departmentId, "Sin departamento");
             String jobRoleName = jobRoleNames.getOrDefault(jobRoleId, "Sin rol");
 
@@ -63,8 +63,8 @@ public class ReportService {
                 departmentFlow.merge(departmentName, 1L, Long::sum);
             }
 
-            Integer durationInStage = history.getDurationInStage();
-            if (durationInStage == null || durationInStage <= 0 || jobRoleId == null || jobRoleId.isBlank()) {
+            Integer durationInNodo = history.getDurationInNodo();
+            if (durationInNodo == null || durationInNodo <= 0 || jobRoleId == null || jobRoleId.isBlank()) {
                 continue;
             }
 
@@ -72,9 +72,9 @@ public class ReportService {
             RolePerformanceAccumulator acc = rolePerformance.computeIfAbsent(key, ignored ->
                     new RolePerformanceAccumulator(departmentName, jobRoleName));
             acc.totalCompleted += 1;
-            acc.totalDurationHours += durationInStage;
-            acc.totalAvgHours += stage.getAvgHours();
-            if (durationInStage <= stage.getAvgHours()) {
+            acc.totalDurationHours += durationInNodo;
+            acc.totalAvgHours += nodo.getAvgHours();
+            if (durationInNodo <= nodo.getAvgHours()) {
                 acc.finishedEarly += 1;
             } else {
                 acc.finishedLate += 1;
@@ -103,7 +103,7 @@ public class ReportService {
         return stats;
     }
 
-    private Set<String> collectStageReferenceIds(List<String> ids) {
+    private Set<String> collectNodoReferenceIds(List<String> ids) {
         return ids.stream().filter(id -> id != null && !id.isBlank()).collect(Collectors.toSet());
     }
 

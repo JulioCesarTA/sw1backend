@@ -18,11 +18,11 @@ public class HistorialTramite {
     private String id;
 
     private String tramiteId;
-    private String fromStageId;
-    private String toStageId;
+    private String fromNodoId;
+    private String toNodoId;
     private String action;
     private String changedById;
     private String comment;
     private Instant changedAt = Instant.now();
-    private Integer durationInStage;
+    private Integer durationInNodo;
 }

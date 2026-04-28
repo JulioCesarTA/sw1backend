@@ -35,23 +35,23 @@ public class WorkflowCollaborationWsController {
         );
     }
 
-    @MessageMapping("/workflows/{workflowId}/lock-stage")
-    public void lockStage(@DestinationVariable String workflowId,
+    @MessageMapping("/workflows/{workflowId}/lock-nodo")
+    public void lockNodo(@DestinationVariable String workflowId,
                           @Payload Map<String, Object> body,
                           @Header("simpSessionId") String sessionId) {
 
-        String stageId = stringValue(body.get("stageId"));
+        String nodoId = stringValue(body.get("nodoId"));
         String userId = stringValue(body.get("userId"));
         String userName = stringValue(body.get("userName"));
-        if (stageId == null || stageId.isBlank() || userId == null || userId.isBlank()) return;
+        if (nodoId == null || nodoId.isBlank() || userId == null || userId.isBlank()) return;
 
         WorkflowCollaborationService.LockAttemptResult result =
-                collaborationService.lockStage(workflowId, stageId, sessionId, userId, userName != null ? userName : userId);
+                collaborationService.lockNodo(workflowId, nodoId, sessionId, userId, userName != null ? userName : userId);
 
         if (result.isGranted()) {
             messagingTemplate.convertAndSend(
                     "/topic/workflows/" + workflowId + "/collab",
-                    Map.of("type", "stage_locked", "lock", result.getLock())
+                    Map.of("type", "nodo_locked", "lock", result.getLock())
             );
             return;
         }
@@ -61,55 +61,55 @@ public class WorkflowCollaborationWsController {
                 Map.of(
                         "type", "lock_denied",
                         "workflowId", workflowId,
-                        "stageId", stageId,
+                        "nodoId", nodoId,
                         "lock", result.getExistingLock(),
                         "targetUserId", userId
                 )
         );
     }
 
-    @MessageMapping("/workflows/{workflowId}/unlock-stage")
-    public void unlockStage(@DestinationVariable String workflowId,
+    @MessageMapping("/workflows/{workflowId}/unlock-nodo")
+    public void unlockNodo(@DestinationVariable String workflowId,
                             @Payload Map<String, Object> body,
                             @Header("simpSessionId") String sessionId) {
 
-        String stageId = stringValue(body.get("stageId"));
+        String nodoId = stringValue(body.get("nodoId"));
         String userId = stringValue(body.get("userId"));
-        if (stageId == null || stageId.isBlank() || userId == null || userId.isBlank()) return;
+        if (nodoId == null || nodoId.isBlank() || userId == null || userId.isBlank()) return;
 
-        WorkflowCollaborationService.StageLock released =
-                collaborationService.unlockStage(workflowId, stageId, sessionId, userId);
+        WorkflowCollaborationService.NodoLock released =
+                collaborationService.unlockNodo(workflowId, nodoId, sessionId, userId);
         if (released == null) return;
 
         messagingTemplate.convertAndSend(
                 "/topic/workflows/" + workflowId + "/collab",
                 Map.of(
-                        "type", "stage_unlocked",
+                        "type", "nodo_unlocked",
                         "workflowId", workflowId,
-                        "stageId", stageId,
+                        "nodoId", nodoId,
                         "userId", released.getUserId()
                 )
         );
     }
 
-    @MessageMapping("/workflows/{workflowId}/move-stage")
-    public void moveStage(@DestinationVariable String workflowId,
+    @MessageMapping("/workflows/{workflowId}/move-nodo")
+    public void moveNodo(@DestinationVariable String workflowId,
                           @Payload Map<String, Object> body,
                           @Header("simpSessionId") String sessionId) {
 
-        String stageId = stringValue(body.get("stageId"));
+        String nodoId = stringValue(body.get("nodoId"));
         String userId = stringValue(body.get("userId"));
         Double x = doubleValue(body.get("x"));
         Double y = doubleValue(body.get("y"));
-        if (stageId == null || x == null || y == null || userId == null || userId.isBlank()) return;
+        if (nodoId == null || x == null || y == null || userId == null || userId.isBlank()) return;
 
-        if (!collaborationService.canMoveStage(workflowId, stageId, sessionId, userId)) {
+        if (!collaborationService.canMoveNodo(workflowId, nodoId, sessionId, userId)) {
             messagingTemplate.convertAndSend(
                     "/topic/workflows/" + workflowId + "/collab",
                     Map.of(
                             "type", "move_denied",
                             "workflowId", workflowId,
-                            "stageId", stageId,
+                            "nodoId", nodoId,
                             "targetUserId", userId
                     )
             );
@@ -119,9 +119,9 @@ public class WorkflowCollaborationWsController {
         messagingTemplate.convertAndSend(
                 "/topic/workflows/" + workflowId + "/collab",
                 Map.of(
-                        "type", "stage_moved",
+                        "type", "nodo_moved",
                         "workflowId", workflowId,
-                        "stageId", stageId,
+                        "nodoId", nodoId,
                         "x", x,
                         "y", y,
                         "userId", userId
@@ -129,18 +129,18 @@ public class WorkflowCollaborationWsController {
         );
     }
 
-    @MessageMapping("/workflows/{workflowId}/stage-created")
-    public void stageCreated(@DestinationVariable String workflowId,
+    @MessageMapping("/workflows/{workflowId}/nodo-created")
+    public void nodoCreated(@DestinationVariable String workflowId,
                              @Payload Map<String, Object> body) {
-        Object stage = body.get("stage");
-        if (stage == null) return;
+        Object nodo = body.get("nodo");
+        if (nodo == null) return;
 
         messagingTemplate.convertAndSend(
                 "/topic/workflows/" + workflowId + "/collab",
                 Map.of(
-                        "type", "stage_created",
+                        "type", "nodo_created",
                         "workflowId", workflowId,
-                        "stage", stage,
+                        "nodo", nodo,
                         "userId", stringValue(body.get("userId"))
                 )
         );
@@ -148,16 +148,16 @@ public class WorkflowCollaborationWsController {
 
     @EventListener
     public void onDisconnect(SessionDisconnectEvent event) {
-        List<WorkflowCollaborationService.StageLock> released =
+        List<WorkflowCollaborationService.NodoLock> released =
                 collaborationService.releaseSession(event.getSessionId());
 
-        for (WorkflowCollaborationService.StageLock lock : released) {
+        for (WorkflowCollaborationService.NodoLock lock : released) {
             messagingTemplate.convertAndSend(
                     "/topic/workflows/" + lock.getWorkflowId() + "/collab",
                     Map.of(
-                            "type", "stage_unlocked",
+                            "type", "nodo_unlocked",
                             "workflowId", lock.getWorkflowId(),
-                            "stageId", lock.getStageId(),
+                            "nodoId", lock.getNodoId(),
                             "userId", lock.getUserId()
                     )
             );
