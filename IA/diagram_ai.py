@@ -220,7 +220,7 @@ create_job_role:
 
 
 def load_dotenv_file() -> None:
-    env_path = Path(__file__).resolve().parent.parent / "backend" / ".env"
+    env_path = Path(__file__).resolve().parent.parent / ".env"
     if not env_path.exists():
         return
     for raw_line in env_path.read_text(encoding="utf-8").splitlines():

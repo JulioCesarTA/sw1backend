@@ -1,0 +1,5 @@
+target
+.git
+tmp_report_inspect
+uploads
+*.log
