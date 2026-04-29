@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from diagram_ai import DIAGRAM_MODEL, HAIKU_MODEL, call_claude
+from ai_common import DIAGRAM_MODEL, HAIKU_MODEL, call_claude
 
 
 FORM_VOICE_PROMPT = """
@@ -56,6 +56,7 @@ Formato obligatorio:
     "title": "Formulario",
     "fields": []
   },
+  "patches": [],
   "changes": "",
   "warnings": []
 }
@@ -66,7 +67,12 @@ Reglas:
 - Si el usuario menciona un nodo por nombre y existe, usa su id real en targetNodoId.
 - Solo modifica el formulario de un nodo de tipo proceso.
 - Devuelve la definicion completa resultante del formulario, no solo el delta.
+- Si el usuario pide cambios para varios nodos en una sola transcripcion, usa patches con una entrada por nodo.
+- Cada item de patches debe tener targetNodoId, requiresForm, formDefinition, changes y warnings.
 - Conserva campos existentes que no hayan sido modificados.
+- Si el usuario pide eliminar un campo, devuelvelo removido de formDefinition.fields.
+- Si el usuario pide eliminar varios campos, remueve todos los indicados.
+- Si el usuario pide eliminar, quitar, borrar o remover todo el formulario de un nodo, responde con requiresForm=false y formDefinition=null.
 - Conserva ids existentes cuando el campo ya existe.
 - Si creas un campo nuevo y no hay id previo, genera un id simple tipo slug.
 - Tipos permitidos: TEXT, NUMBER, DATE, FILE, EMAIL, CHECKBOX, GRID.
@@ -80,6 +86,20 @@ Reglas:
 - Un campo GRID debe incluir columns.
 - Usa isRequired=true cuando el usuario diga obligatorio, requerido o mandatorio.
 - Si el target es ambiguo o invalido, no inventes; devuelve warning y targetNodoId vacio.
+- Si el usuario dicta columnas de una grilla, crea columns completas en el orden indicado.
+- Si el usuario dice "primera columna", "segunda columna", etc., asigna nombres reales a cada columna.
+
+Ejemplos:
+- "agregale en su formulario el campo hola de tipo fecha"
+  => agrega un campo nuevo llamado hola con type DATE.
+- "agrega en el formulario una grilla productos, la primera columna es juan y la segunda columna es pedro"
+  => agrega un campo GRID llamado productos con columns [{name:"juan"},{name:"pedro"}].
+- "en el nodo secretaria academica elimina el campo observaciones"
+  => devuelve la definicion completa del formulario sin el campo observaciones.
+- "en el nodo juan elimina su formulario"
+  => responde con requiresForm=false y formDefinition=null.
+- "al nodo x agregale el campo y de tipo file y al nodo z quita el campo k"
+  => responde con patches para ambos nodos.
 """
 
 
@@ -167,49 +187,44 @@ def process_form_voice_design(body: dict[str, Any]) -> dict[str, Any]:
         raw = call_claude(FORM_DESIGN_VOICE_PROMPT, DIAGRAM_MODEL, 4096, messages)
 
     parsed = parse_json_object(raw)
-    target_nodo_id = str(parsed.get("targetNodoId") or "").strip()
     nodos_by_id = {
         str(item.get("id") or "").strip(): item
         for item in nodos
         if str(item.get("id") or "").strip()
     }
-    target_nodo = nodos_by_id.get(target_nodo_id)
-    warnings = [str(item).strip() for item in (parsed.get("warnings") or []) if str(item).strip()]
+    raw_patches = parsed.get("patches")
+    if isinstance(raw_patches, list) and raw_patches:
+        normalized_patches = [
+            normalize_form_design_patch(item, nodos_by_id, selected_nodo, transcript)
+            for item in raw_patches
+            if isinstance(item, dict)
+        ]
+        valid_patches = [item for item in normalized_patches if item]
+        aggregated_warnings = [warning for item in valid_patches for warning in (item.get("warnings") or [])]
+        return {
+            "targetNodoId": valid_patches[0]["targetNodoId"] if valid_patches else "",
+            "requiresForm": bool(valid_patches[0].get("requiresForm", True)) if valid_patches else True,
+            "formDefinition": valid_patches[0].get("formDefinition") if valid_patches else None,
+            "changes": str(parsed.get("changes") or "").strip(),
+            "warnings": aggregated_warnings,
+            "patches": valid_patches,
+        }
 
-    if not target_nodo and selected_nodo and mentions_selected_node(transcript):
-        fallback_id = str(selected_nodo.get("id") or "").strip()
-        target_nodo = nodos_by_id.get(fallback_id) or selected_nodo
-        target_nodo_id = fallback_id
-
-    if not target_nodo_id or not target_nodo:
+    normalized_patch = normalize_form_design_patch(parsed, nodos_by_id, selected_nodo, transcript)
+    if not normalized_patch:
+        warnings = [str(item).strip() for item in (parsed.get("warnings") or []) if str(item).strip()]
         return {
             "targetNodoId": "",
             "requiresForm": True,
             "formDefinition": None,
             "changes": str(parsed.get("changes") or "").strip(),
             "warnings": warnings or ["No se pudo identificar el nodo a modificar"],
+            "patches": [],
         }
-
-    node_type = str(target_nodo.get("nodeType") or "").strip().lower()
-    if node_type != "proceso":
-        return {
-            "targetNodoId": target_nodo_id,
-            "requiresForm": False,
-            "formDefinition": None,
-            "changes": "",
-            "warnings": warnings + ["Solo se puede modificar el formulario de nodos tipo proceso"],
-        }
-
-    current_form = target_nodo.get("formDefinition") or {}
-    raw_form_definition = parsed.get("formDefinition") or current_form
-    normalized_form = normalize_form_definition(raw_form_definition, current_form)
 
     return {
-        "targetNodoId": target_nodo_id,
-        "requiresForm": bool(parsed.get("requiresForm", True)),
-        "formDefinition": normalized_form,
-        "changes": str(parsed.get("changes") or "").strip(),
-        "warnings": warnings,
+        **normalized_patch,
+        "patches": [normalized_patch],
     }
 
 
@@ -312,6 +327,64 @@ def parse_json_object(text: str) -> dict[str, Any]:
 def mentions_selected_node(transcript: str) -> bool:
     normalized = transcript.strip().lower()
     return any(token in normalized for token in ["este nodo", "nodo actual", "este proceso", "proceso actual", "aqui", "acá", "aca"])
+
+
+def transcript_requests_form_removal(transcript: str) -> bool:
+    normalized = transcript.strip().lower()
+    removal_tokens = ["elimina", "eliminar", "quita", "quitar", "borra", "borrar", "remueve", "remover"]
+    form_tokens = ["formulario", "su formulario", "el formulario", "todo el formulario"]
+    return any(token in normalized for token in removal_tokens) and any(token in normalized for token in form_tokens)
+
+
+def normalize_form_design_patch(
+    parsed: dict[str, Any],
+    nodos_by_id: dict[str, Any],
+    selected_nodo: dict[str, Any],
+    transcript: str,
+) -> dict[str, Any] | None:
+    target_nodo_id = str(parsed.get("targetNodoId") or "").strip()
+    target_nodo = nodos_by_id.get(target_nodo_id)
+    warnings = [str(item).strip() for item in (parsed.get("warnings") or []) if str(item).strip()]
+
+    if not target_nodo and selected_nodo and mentions_selected_node(transcript):
+        fallback_id = str(selected_nodo.get("id") or "").strip()
+        target_nodo = nodos_by_id.get(fallback_id) or selected_nodo
+        target_nodo_id = fallback_id
+
+    if not target_nodo_id or not target_nodo:
+        return None
+
+    node_type = str(target_nodo.get("nodeType") or "").strip().lower()
+    if node_type != "proceso":
+        return {
+            "targetNodoId": target_nodo_id,
+            "requiresForm": False,
+            "formDefinition": None,
+            "changes": "",
+            "warnings": warnings + ["Solo se puede modificar el formulario de nodos tipo proceso"],
+        }
+
+    current_form = target_nodo.get("formDefinition") or {}
+    requires_form = bool(parsed.get("requiresForm", True))
+    patch_changes = str(parsed.get("changes") or "").strip()
+    if transcript_requests_form_removal(transcript) or requires_form is False:
+        return {
+            "targetNodoId": target_nodo_id,
+            "requiresForm": False,
+            "formDefinition": None,
+            "changes": patch_changes or "Se elimino el formulario del nodo",
+            "warnings": warnings,
+        }
+
+    raw_form_definition = parsed["formDefinition"] if "formDefinition" in parsed else current_form
+    normalized_form = normalize_form_definition(raw_form_definition, current_form)
+    return {
+        "targetNodoId": target_nodo_id,
+        "requiresForm": True,
+        "formDefinition": normalized_form,
+        "changes": patch_changes,
+        "warnings": warnings,
+    }
 
 
 def normalize_form_definition(raw_form_definition: Any, current_form: Any) -> dict[str, Any]:

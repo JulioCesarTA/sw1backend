@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from diagram_ai import HAIKU_MODEL, call_claude, get_db, parse_json_response, to_json
+from ai_common import HAIKU_MODEL, call_claude, get_db, parse_json_response, to_json
 
 
 BOTTLENECK_SYSTEM_PROMPT = """

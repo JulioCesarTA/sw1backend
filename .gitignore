@@ -4,7 +4,6 @@ target/
 node_modules/
 
 # Local environment and secrets
-.env
 *.token
 
 # Logs and temp artifacts

@@ -19,6 +19,7 @@ import com.workflow.repository.WorkflowRepository;
 import com.workflow.repository.WorkflowNodoRepository;
 import com.workflow.repository.WorkflowTransitionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -33,6 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class TramiteService {
 
@@ -562,12 +564,38 @@ public class TramiteService {
 
     private void sendStatusNotification(Tramite tramite, String title, String body) {
         String email = findEmailFromTramite(tramite);
-        if (email == null || email.isBlank()) return;
-        userRepository.findByEmail(email).ifPresent(user -> {
-            if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
-                fcmService.sendNotification(user.getFcmToken(), title, body);
+        Set<String> notifiedUserIds = new LinkedHashSet<>();
+        boolean sent = false;
+
+        if (email != null && !email.isBlank()) {
+            var userByEmail = userRepository.findByEmail(email).orElse(null);
+            if (userByEmail == null) {
+                log.debug("No se encontró usuario con email {} para notificación de trámite {}", email, tramite.getCode());
+            } else if (userByEmail.getFcmToken() == null || userByEmail.getFcmToken().isBlank()) {
+                log.debug("Usuario {} encontrado por email pero sin fcmToken para trámite {}", email, tramite.getCode());
+            } else {
+                fcmService.sendNotification(userByEmail.getFcmToken(), title, body);
+                notifiedUserIds.add(userByEmail.getId());
+                sent = true;
             }
-        });
+        } else {
+            log.debug("No se encontró email del primer proceso para trámite {}", tramite.getCode());
+        }
+
+        if (tramite.getRequestedById() != null && !tramite.getRequestedById().isBlank()) {
+            userRepository.findById(tramite.getRequestedById()).ifPresent(user -> {
+                if (!notifiedUserIds.contains(user.getId())
+                        && user.getFcmToken() != null
+                        && !user.getFcmToken().isBlank()) {
+                    fcmService.sendNotification(user.getFcmToken(), title, body);
+                }
+            });
+        }
+
+        if (!sent) {
+            log.debug("No se envió notificación push para trámite {}. Email detectado: {}, requestedById: {}",
+                    tramite.getCode(), email, tramite.getRequestedById());
+        }
     }
 
     private String findEmailFromTramite(Tramite tramite) {
@@ -958,6 +986,10 @@ public class TramiteService {
             root.setStatus(isFinal ? Tramite.Status.COMPLETADO : Tramite.Status.EN_PROGRESO);
             tramiteRepo.save(root);
             recordHistory(root.getId(), joinNodo.getId(), nextTransition.getToNodoId(), "UNION_COMPLETADA", userId, "Todas las ramas completadas");
+            if (isFinal) {
+                sendStatusNotification(root, "Trámite completado",
+                        "Tu trámite " + root.getCode() + " ha sido completado exitosamente.");
+            }
         }
 
         clones.forEach(clone -> tramiteRepo.deleteById(clone.getId()));

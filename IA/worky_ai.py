@@ -1,6 +1,6 @@
 from typing import Any
 
-from diagram_ai import HAIKU_MODEL, call_claude, parse_json_response, to_json
+from ai_common import HAIKU_MODEL, call_claude, parse_json_response, to_json
 
 
 WORKY_SYSTEM_PROMPT = """

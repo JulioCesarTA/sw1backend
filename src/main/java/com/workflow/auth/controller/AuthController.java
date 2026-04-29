@@ -3,9 +3,11 @@ package com.workflow.auth.controller;
 import com.workflow.auth.service.AuthService;
 import com.workflow.model.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -34,9 +36,10 @@ public class AuthController {
     public ResponseEntity<Void> saveFcmToken(
             @AuthenticationPrincipal User user,
             @RequestBody Map<String, String> body) {
-        if (user != null) {
-            authService.saveFcmToken(user.getId(), body.get("fcmToken"));
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacion requerida");
         }
+        authService.saveFcmToken(user.getId(), body.get("fcmToken"));
         return ResponseEntity.noContent().build();
     }
 
@@ -47,12 +50,18 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@AuthenticationPrincipal User user) {
-        if (user != null) authService.logout(user.getId());
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacion requerida");
+        }
+        authService.logout(user.getId());
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> me(@AuthenticationPrincipal User user) {
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacion requerida");
+        }
         return ResponseEntity.ok(authService.me(user));
     }
 }
