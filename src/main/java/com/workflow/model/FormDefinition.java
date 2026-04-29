@@ -27,11 +27,21 @@ public class FormDefinition {
         private String id;
         private String name;
         private FieldType type;
+        private List<GridColumn> columns;
         private boolean isRequired = false;
         private int order;
     }
 
+    @Data
+    @NoArgsConstructor
+    public static class GridColumn {
+        private String id;
+        private String name;
+        private FieldType type;
+        private int order;
+    }
+
     public enum FieldType {
-        TEXT, NUMBER, DATE, FILE, EMAIL
+        TEXT, NUMBER, DATE, FILE, EMAIL, CHECKBOX, GRID
     }
 }

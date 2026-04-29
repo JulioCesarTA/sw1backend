@@ -25,4 +25,7 @@ public class WorkflowNodo {
     private Double posX;
     private Double posY;
     private String responsibleJobRoleId;
+    private String trueLabel;
+    private String falseLabel;
+    private String condition;
 }

@@ -34,12 +34,20 @@ public class WorkflowAiProxyService {
         return post("/diagram-command", body);
     }
 
+    public Map<String, Object> diagramVoiceCommand(Map<String, Object> body) {
+        return post("/diagram-voice-command", body);
+    }
+
     public Map<String, Object> bottleneckAnalysis(Map<String, Object> body) {
         return post("/bottleneck-analysis", body);
     }
 
     public Map<String, Object> workySuggestions(Map<String, Object> body) {
         return post("/worky-suggestions", body);
+    }
+
+    public Map<String, Object> formVoiceFill(Map<String, Object> body) {
+        return post("/form-voice-fill", body);
     }
 
     private Map<String, Object> post(String path, Map<String, Object> body) {

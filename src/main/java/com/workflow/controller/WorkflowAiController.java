@@ -19,6 +19,11 @@ public class WorkflowAiController {
         return ResponseEntity.ok(workflowAiProxyService.diagramCommand(body));
     }
 
+    @PostMapping("/diagramaporvoz")
+    public ResponseEntity<Map<String, Object>> diagramVoiceCommand(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(workflowAiProxyService.diagramVoiceCommand(body));
+    }
+
     @PostMapping("/detectcuellodebotella")
     public ResponseEntity<Map<String, Object>> bottleneckAnalysis(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(workflowAiProxyService.bottleneckAnalysis(body));
@@ -29,4 +34,3 @@ public class WorkflowAiController {
         return ResponseEntity.ok(workflowAiProxyService.workySuggestions(body));
     }
 }
-

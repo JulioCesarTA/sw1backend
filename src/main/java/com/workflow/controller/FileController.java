@@ -4,6 +4,7 @@ import com.workflow.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,11 +30,22 @@ public class FileController {
     }
 
     @GetMapping("/{storedName}/download")
-    public ResponseEntity<Void> download(@PathVariable String storedName,
-                                         @RequestParam(name = "filename", required = false) String filename) {
-        String signedUrl = fileStorageService.createPresignedDownloadUrl(storedName, filename);
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .header(HttpHeaders.LOCATION, URI.create(signedUrl).toString())
-                .build();
+    public ResponseEntity<?> download(@PathVariable String storedName,
+                                      @RequestParam(name = "filename", required = false) String filename) {
+        if (fileStorageService.isS3Available()) {
+            String signedUrl = fileStorageService.createPresignedDownloadUrl(storedName, filename);
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .header(HttpHeaders.LOCATION, URI.create(signedUrl).toString())
+                    .build();
+        }
+
+        byte[] data = fileStorageService.readLocalFile(storedName);
+        String contentType = fileStorageService.detectContentType(storedName);
+        String safeFilename = (filename == null || filename.isBlank()) ? storedName : filename.replace("\"", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFilename + "\"")
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION)
+                .body(data);
     }
 }

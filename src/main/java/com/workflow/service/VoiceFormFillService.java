@@ -24,6 +24,9 @@ public class VoiceFormFillService {
     private static final Pattern TEXT_CLEANUP_PREFIX = Pattern.compile("^(es|sera|seria|pone|pon|ponle|coloca|colocale|con|valor|dice|igual a)\\s+");
     private static final Pattern SPANISH_LONG_DATE_PATTERN = Pattern.compile("\\b(\\d{1,2})\\s+de\\s+([a-záéíóú]+)\\s+de\\s+(\\d{4})\\b");
 
+    private static final List<String> BOOLEAN_TRUE_WORDS = List.of("si", "sí", "verdadero", "true", "marcado", "marcar", "activar", "activo", "acepto");
+    private static final List<String> BOOLEAN_FALSE_WORDS = List.of("no", "falso", "false", "desmarcado", "desmarcar", "desactivar", "inactivo", "rechazo");
+
     public Map<String, Object> parseTranscript(String transcript,
                                                FormDefinition formDefinition,
                                                Map<String, Object> currentFormData) {
@@ -128,9 +131,25 @@ public class VoiceFormFillService {
             case NUMBER -> parseNumber(rawValue);
             case DATE -> parseDate(rawValue);
             case EMAIL -> parseEmail(rawValue);
-            case FILE -> null;
+            case CHECKBOX -> parseCheckbox(rawValue);
+            case FILE, GRID -> null;
             case TEXT -> cleanupRawValue(rawValue);
         };
+    }
+
+    private Boolean parseCheckbox(String rawValue) {
+        String normalized = normalize(rawValue);
+        for (String token : BOOLEAN_TRUE_WORDS) {
+            if (normalized.contains(normalize(token))) {
+                return true;
+            }
+        }
+        for (String token : BOOLEAN_FALSE_WORDS) {
+            if (normalized.contains(normalize(token))) {
+                return false;
+            }
+        }
+        return null;
     }
 
     private Object parseNumber(String rawValue) {

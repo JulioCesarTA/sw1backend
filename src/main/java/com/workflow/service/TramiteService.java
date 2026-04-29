@@ -46,6 +46,7 @@ public class TramiteService {
     private final DepartmentRepository departmentRepo;
     private final UserRepository userRepository;
     private final VoiceFormFillService voiceFormFillService;
+    private final WorkflowAiProxyService workflowAiProxyService;
     private final FcmService fcmService;
     private final ReportRealtimeService reportRealtimeService;
     private final List<NodoTipoHandler> nodoTipoHandlers = List.of(
@@ -385,9 +386,50 @@ public class TramiteService {
         FormDefinition formDefinition = formRepo.findByNodoId(currentNodo.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La actividad actual no tiene formulario"));
 
-        Map<String, Object> result = voiceFormFillService.parseTranscript(transcript, formDefinition, tramite.getFormData());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> currentFormData = (Map<String, Object>) body.get("formData");
+        Map<String, Object> result = parseVoiceTranscript(
+                transcript,
+                formDefinition,
+                currentFormData != null ? currentFormData : tramite.getFormData()
+        );
         result.put("activityId", tramite.getId());
         result.put("currentNodoId", currentNodo.getId());
+        return result;
+    }
+
+    public Map<String, Object> parseVoiceFillForCreate(Map<String, Object> body, User actor) {
+        String workflowId = String.valueOf(body.getOrDefault("workflowId", "")).trim();
+        if (workflowId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workflowId es obligatorio");
+        }
+
+        Workflow workflow = workflowRepo.findById(workflowId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow no encontrado"));
+        if (!hasWorkflowAccess(actor, workflow)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a este workflow");
+        }
+
+        String transcript = String.valueOf(body.getOrDefault("transcript", "")).trim();
+        if (transcript.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes enviar el texto reconocido");
+        }
+
+        List<WorkflowNodo> nodos = nodoRepo.findByWorkflowIdOrderByOrderAsc(workflow.getId());
+        List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(workflow.getId());
+        WorkflowNodo entryNodo = resolveEntryNodo(nodos, transitions);
+        if (entryNodo == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El workflow no tiene una etapa inicial valida");
+        }
+
+        FormDefinition formDefinition = formRepo.findByNodoId(entryNodo.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La etapa inicial no tiene formulario"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> currentFormData = (Map<String, Object>) body.getOrDefault("formData", Map.of());
+        Map<String, Object> result = parseVoiceTranscript(transcript, formDefinition, currentFormData);
+        result.put("workflowId", workflow.getId());
+        result.put("currentNodoId", entryNodo.getId());
         return result;
     }
 
@@ -616,6 +658,141 @@ public class TramiteService {
         return incomingData;
     }
 
+    private WorkflowNodo resolveEntryNodo(List<WorkflowNodo> nodos, List<WorkflowTransition> transitions) {
+        if (nodos == null || nodos.isEmpty()) {
+            return null;
+        }
+        WorkflowNodo initialNodo = nodos.stream()
+                .filter(nodo -> "inicio".equalsIgnoreCase(nodo.getNodeType()))
+                .findFirst()
+                .orElse(null);
+        WorkflowNodo firstWorkNodo = nodos.stream()
+                .filter(nodo -> !"inicio".equalsIgnoreCase(nodo.getNodeType()))
+                .findFirst()
+                .orElse(initialNodo);
+        if (initialNodo == null) {
+            return firstWorkNodo;
+        }
+        WorkflowTransition startTransition = transitions.stream()
+                .filter(transition -> initialNodo.getId().equals(transition.getFromNodoId()))
+                .findFirst()
+                .orElse(null);
+        if (startTransition == null) {
+            return firstWorkNodo;
+        }
+        return nodos.stream()
+                .filter(nodo -> startTransition.getToNodoId().equals(nodo.getId()))
+                .findFirst()
+                .orElse(firstWorkNodo);
+    }
+
+    private Map<String, Object> parseVoiceTranscript(String transcript,
+                                                     FormDefinition formDefinition,
+                                                     Map<String, Object> currentFormData) {
+        Map<String, Object> current = currentFormData == null ? Map.of() : currentFormData;
+        try {
+            Map<String, Object> aiResult = workflowAiProxyService.formVoiceFill(Map.of(
+                    "transcript", transcript,
+                    "formDefinition", toFormDefinitionPayload(formDefinition),
+                    "currentFormData", current
+            ));
+            return normalizeAiVoiceResult(transcript, current, aiResult);
+        } catch (Exception ignored) {
+            return voiceFormFillService.parseTranscript(transcript, formDefinition, current);
+        }
+    }
+
+    private Map<String, Object> normalizeAiVoiceResult(String transcript,
+                                                       Map<String, Object> currentFormData,
+                                                       Map<String, Object> aiResult) {
+        Map<String, Object> mergedFormData = new LinkedHashMap<>();
+        mergedFormData.putAll(currentFormData);
+
+        Map<String, Object> fieldValues = extractObjectMap(aiResult.get("fieldValues"));
+        mergedFormData.putAll(fieldValues);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("transcript", transcript);
+        response.put("formData", mergedFormData);
+        response.put("appliedFields", extractAppliedFields(aiResult.get("appliedFields"), fieldValues));
+        response.put("warnings", extractStringList(aiResult.get("warnings")));
+        return response;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractObjectMap(Object rawValue) {
+        if (!(rawValue instanceof Map<?, ?> rawMap)) {
+            return Map.of();
+        }
+        Map<String, Object> mapped = new LinkedHashMap<>();
+        rawMap.forEach((key, value) -> mapped.put(String.valueOf(key), value));
+        return mapped;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> extractAppliedFields(Object rawValue, Map<String, Object> fieldValues) {
+        if (rawValue instanceof List<?> rawList) {
+            return rawList.stream()
+                    .filter(Map.class::isInstance)
+                    .map(item -> (Map<String, Object>) item)
+                    .map(item -> {
+                        Map<String, Object> mapped = new LinkedHashMap<>();
+                        mapped.put("field", String.valueOf(item.getOrDefault("field", "")));
+                        mapped.put("value", item.get("value"));
+                        return mapped;
+                    })
+                    .filter(item -> !String.valueOf(item.get("field")).isBlank())
+                    .toList();
+        }
+        return fieldValues.entrySet().stream()
+                .map(entry -> {
+                    Map<String, Object> mapped = new LinkedHashMap<>();
+                    mapped.put("field", entry.getKey());
+                    mapped.put("value", entry.getValue());
+                    return mapped;
+                })
+                .toList();
+    }
+
+    private List<String> extractStringList(Object rawValue) {
+        if (!(rawValue instanceof List<?> rawList)) {
+            return List.of();
+        }
+        return rawList.stream()
+                .map(String::valueOf)
+                .filter(value -> !value.isBlank())
+                .toList();
+    }
+
+    private Map<String, Object> toFormDefinitionPayload(FormDefinition formDefinition) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("id", formDefinition.getId());
+        payload.put("nodoId", formDefinition.getNodoId());
+        payload.put("title", formDefinition.getTitle());
+        payload.put("fields", formDefinition.getFields() == null ? List.of() : formDefinition.getFields().stream()
+                .map(field -> {
+                    Map<String, Object> mapped = new LinkedHashMap<>();
+                    mapped.put("id", field.getId());
+                    mapped.put("name", field.getName());
+                    mapped.put("type", field.getType() != null ? field.getType().name() : "TEXT");
+                    mapped.put("isRequired", field.isRequired());
+                    mapped.put("order", field.getOrder());
+                    mapped.put("columns", field.getColumns() == null ? List.of() : field.getColumns().stream()
+                            .map(column -> {
+                                Map<String, Object> mappedColumn = new LinkedHashMap<>();
+                                mappedColumn.put("id", column.getId());
+                                mappedColumn.put("name", column.getName());
+                                mappedColumn.put("type", column.getType() != null ? column.getType().name() : "TEXT");
+                                mappedColumn.put("order", column.getOrder());
+                                return mappedColumn;
+                            })
+                            .toList());
+                    return mapped;
+                })
+                .toList());
+        return payload;
+    }
+
     private List<Map<String, Object>> buildSharedFields(WorkflowNodo sourceNodo, WorkflowTransition transition,
                                                         Map<String, Object> tramiteData,
                                                         List<WorkflowTransition> transitions, Set<String> visitedNodoIds) {
@@ -623,16 +800,18 @@ public class TramiteService {
         Map<String, Object> forwardConfig = transition.getForwardConfig();
         String mode = resolveForwardMode(forwardConfig);
         Set<String> selectedFieldNames = resolveSelectedFields(forwardConfig);
+        boolean includeFiles = resolveIncludeFiles(forwardConfig);
 
         return sourceFields.stream()
-                .filter(field -> shouldIncludeField(field, mode, selectedFieldNames))
+                .filter(field -> shouldIncludeField(field, mode, selectedFieldNames, includeFiles))
                 .map(field -> {
                     Object value = tramiteData.get(field.getName());
-                    if (value == null || String.valueOf(value).isBlank()) return null;
+                    if (!hasMeaningfulValue(value)) return null;
                     Map<String, Object> map = new LinkedHashMap<>();
                     map.put("label", field.getName());
                     map.put("name", field.getName());
                     map.put("type", field.getType());
+                    map.put("columns", field.getColumns());
                     map.put("value", value);
                     return map;
                 })
@@ -662,12 +841,22 @@ public class TramiteService {
         List<FormDefinition.FormField> sourceFields = getForwardableFields(sourceNodo, transitions, visitedNodoIds);
         Map<String, Object> forwardConfig = transition.getForwardConfig();
         return sourceFields.stream()
-                .filter(field -> shouldIncludeField(field, resolveForwardMode(forwardConfig), resolveSelectedFields(forwardConfig)))
+                .filter(field -> shouldIncludeField(
+                        field,
+                        resolveForwardMode(forwardConfig),
+                        resolveSelectedFields(forwardConfig),
+                        resolveIncludeFiles(forwardConfig)
+                ))
                 .toList();
     }
 
     private String resolveForwardMode(Map<String, Object> forwardConfig) {
-        return forwardConfig != null && "selected".equals(String.valueOf(forwardConfig.get("mode"))) ? "selected" : "none";
+        if (forwardConfig == null) return "none";
+        String mode = String.valueOf(forwardConfig.get("mode")).trim().toLowerCase();
+        return switch (mode) {
+            case "selected", "all", "files-only" -> mode;
+            default -> "none";
+        };
     }
 
     private Set<String> resolveSelectedFields(Map<String, Object> forwardConfig) {
@@ -676,6 +865,15 @@ public class TramiteService {
             fieldNames.stream().map(String::valueOf).forEach(selected::add);
         }
         return selected;
+    }
+
+    private boolean resolveIncludeFiles(Map<String, Object> forwardConfig) {
+        if (forwardConfig == null) return false;
+        Object includeFiles = forwardConfig.get("includeFiles");
+        if (includeFiles instanceof Boolean value) {
+            return value;
+        }
+        return "files-only".equals(resolveForwardMode(forwardConfig));
     }
 
     private List<FormDefinition.FormField> dedupeFields(List<FormDefinition.FormField> fields) {
@@ -687,9 +885,24 @@ public class TramiteService {
         return new ArrayList<>(deduped.values());
     }
 
-    private boolean shouldIncludeField(FormDefinition.FormField field, String mode, Set<String> selectedFieldNames) {
+    private boolean shouldIncludeField(FormDefinition.FormField field, String mode, Set<String> selectedFieldNames, boolean includeFiles) {
+        if (field == null) return false;
+        boolean isFileField = FormDefinition.FieldType.FILE.equals(field.getType());
         if ("none".equalsIgnoreCase(mode)) return false;
-        return "selected".equalsIgnoreCase(mode) && selectedFieldNames.contains(field.getName());
+        if ("files-only".equalsIgnoreCase(mode)) return isFileField;
+        if ("all".equalsIgnoreCase(mode)) return includeFiles || !isFileField;
+        if ("selected".equalsIgnoreCase(mode)) {
+            return selectedFieldNames.contains(field.getName()) || (includeFiles && isFileField);
+        }
+        return false;
+    }
+
+    private boolean hasMeaningfulValue(Object value) {
+        if (value == null) return false;
+        if (value instanceof CharSequence text) return !text.toString().isBlank();
+        if (value instanceof List<?> list) return !list.isEmpty();
+        if (value instanceof Map<?, ?> map) return !map.isEmpty();
+        return true;
     }
 
     private boolean hasWorkflowAccess(User actor, Workflow workflow) {

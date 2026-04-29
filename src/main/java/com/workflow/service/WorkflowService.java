@@ -198,6 +198,9 @@ public class WorkflowService {
             nodo.setPosY(((Number) body.get("posY")).doubleValue());
         }
         if (body.containsKey("responsibleJobRoleId")) nodo.setResponsibleJobRoleId((String) body.get("responsibleJobRoleId"));
+        if (body.containsKey("trueLabel")) nodo.setTrueLabel((String) body.get("trueLabel"));
+        if (body.containsKey("falseLabel")) nodo.setFalseLabel((String) body.get("falseLabel"));
+        if (body.containsKey("condition")) nodo.setCondition((String) body.get("condition"));
     }
 
     @SuppressWarnings("unchecked")
@@ -248,6 +251,7 @@ public class WorkflowService {
             mapped.setId((String) field.get("id"));
             mapped.setName((String) field.getOrDefault("name", field.get("id")));
             mapped.setType(parseFieldType(field.get("type")));
+            mapped.setColumns(mapGridColumns(field.get("columns")));
 
             boolean required = Boolean.TRUE.equals(field.get("required")) || Boolean.TRUE.equals(field.get("isRequired"));
             mapped.setRequired(required);
@@ -259,6 +263,30 @@ public class WorkflowService {
         return fields;
     }
 
+    @SuppressWarnings("unchecked")
+    private List<FormDefinition.GridColumn> mapGridColumns(Object rawColumns) {
+        if (!(rawColumns instanceof List<?> rawList) || rawList.isEmpty()) {
+            return List.of();
+        }
+
+        List<FormDefinition.GridColumn> columns = new ArrayList<>();
+        for (int index = 0; index < rawList.size(); index++) {
+            Object rawColumn = rawList.get(index);
+            if (!(rawColumn instanceof Map<?, ?> columnMapRaw)) {
+                continue;
+            }
+            Map<String, Object> columnMap = (Map<String, Object>) columnMapRaw;
+            FormDefinition.GridColumn column = new FormDefinition.GridColumn();
+            column.setId((String) columnMap.get("id"));
+            column.setName((String) columnMap.getOrDefault("name", columnMap.get("id")));
+            column.setType(parseGridColumnType(columnMap.get("type")));
+            Object order = columnMap.get("order");
+            column.setOrder(order instanceof Number number ? number.intValue() : index + 1);
+            columns.add(column);
+        }
+        return columns;
+    }
+
     private FormDefinition.FieldType parseFieldType(Object rawType) {
         if (rawType == null) {
             return FormDefinition.FieldType.TEXT;
@@ -268,6 +296,11 @@ public class WorkflowService {
         } catch (IllegalArgumentException ex) {
             return FormDefinition.FieldType.TEXT;
         }
+    }
+
+    private FormDefinition.FieldType parseGridColumnType(Object rawType) {
+        FormDefinition.FieldType parsed = parseFieldType(rawType);
+        return parsed == FormDefinition.FieldType.GRID ? FormDefinition.FieldType.TEXT : parsed;
     }
 
     private String normalizarTipoNodo(String rawNodeType) {
@@ -317,14 +350,24 @@ public class WorkflowService {
             if (raw == null) {
                 transition.setForwardConfig(null);
             } else {
-                String mode = "selected".equals(String.valueOf(raw.get("mode"))) ? "selected" : "none";
+                String mode = normalizeForwardMode(raw.get("mode"));
                 Object fieldNames = raw.get("fieldNames");
-                transition.setForwardConfig(Map.of(
-                        "mode", mode,
-                        "fieldNames", "selected".equals(mode) && fieldNames instanceof java.util.List<?> ? fieldNames : java.util.List.of()
-                ));
+                boolean includeFiles = Boolean.TRUE.equals(raw.get("includeFiles")) || "files-only".equals(mode);
+                Map<String, Object> forwardConfig = new LinkedHashMap<>();
+                forwardConfig.put("mode", mode);
+                forwardConfig.put("fieldNames", "selected".equals(mode) && fieldNames instanceof java.util.List<?> ? fieldNames : java.util.List.of());
+                forwardConfig.put("includeFiles", includeFiles);
+                transition.setForwardConfig(forwardConfig);
             }
         }
+    }
+
+    private String normalizeForwardMode(Object rawMode) {
+        String mode = rawMode == null ? "none" : String.valueOf(rawMode).trim().toLowerCase();
+        return switch (mode) {
+            case "selected", "all", "files-only" -> mode;
+            default -> "none";
+        };
     }
 
     private void validateTransitionStructure(WorkflowTransition transition) {

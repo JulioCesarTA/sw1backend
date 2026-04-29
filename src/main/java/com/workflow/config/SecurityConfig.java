@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers("/auth/login", "/auth/refresh", "/auth/register").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/reports/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/files/*/download").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .anyRequest().authenticated()
             )

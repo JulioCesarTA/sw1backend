@@ -34,4 +34,10 @@ public class TramiteController {
                                                                @AuthenticationPrincipal User user) {
         return ResponseEntity.status(HttpStatus.CREATED).body(tramiteService.createAndSubmit(body, user.getId()));
     }
+
+    @PostMapping("/voice-fill")
+    public ResponseEntity<Map<String, Object>> voiceFillForCreate(@RequestBody Map<String, Object> body,
+                                                                  @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(tramiteService.parseVoiceFillForCreate(body, user));
+    }
 }
