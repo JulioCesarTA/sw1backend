@@ -117,7 +117,7 @@ public class WorkflowService {
             try {
                 WorkflowNodo saved = nodoRepo.save(nodo);
                 syncNodoFormDefinition(saved, body);
-                return saved;
+                return hydrateNodoFormDefinition(saved);
             } catch (DuplicateKeyException ex) {
                 nodo.setOrder(resolveCreateOrder(workflowId, nodo.getOrder() + 1));
             }
@@ -136,7 +136,7 @@ public class WorkflowService {
         applyNodoFields(nodo, body);
         WorkflowNodo saved = nodoRepo.save(nodo);
         syncNodoFormDefinition(saved, body);
-        return saved;
+        return hydrateNodoFormDefinition(saved);
     }
 
     public void deleteNodo(String id) {
@@ -396,6 +396,14 @@ public class WorkflowService {
         if ("fin".equals(toType) && !"proceso".equals(fromType)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fin solo puede recibir conexion desde un Proceso");
         }
+    }
+
+    private WorkflowNodo hydrateNodoFormDefinition(WorkflowNodo nodo) {
+        if (nodo == null) {
+            return null;
+        }
+        nodo.setFormDefinition(formRepo.findByNodoId(nodo.getId()).orElse(null));
+        return nodo;
     }
 
     private Map<String, Object> enrichWorkflowFull(Workflow workflow) {

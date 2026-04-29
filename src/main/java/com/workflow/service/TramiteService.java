@@ -45,7 +45,6 @@ public class TramiteService {
     private final JobRoleRepository jobRoleRepo;
     private final DepartmentRepository departmentRepo;
     private final UserRepository userRepository;
-    private final VoiceFormFillService voiceFormFillService;
     private final WorkflowAiProxyService workflowAiProxyService;
     private final FcmService fcmService;
     private final ReportRealtimeService reportRealtimeService;
@@ -690,16 +689,12 @@ public class TramiteService {
                                                      FormDefinition formDefinition,
                                                      Map<String, Object> currentFormData) {
         Map<String, Object> current = currentFormData == null ? Map.of() : currentFormData;
-        try {
-            Map<String, Object> aiResult = workflowAiProxyService.formVoiceFill(Map.of(
-                    "transcript", transcript,
-                    "formDefinition", toFormDefinitionPayload(formDefinition),
-                    "currentFormData", current
-            ));
-            return normalizeAiVoiceResult(transcript, current, aiResult);
-        } catch (Exception ignored) {
-            return voiceFormFillService.parseTranscript(transcript, formDefinition, current);
-        }
+        Map<String, Object> aiResult = workflowAiProxyService.formVoiceFill(Map.of(
+                "transcript", transcript,
+                "formDefinition", toFormDefinitionPayload(formDefinition),
+                "currentFormData", current
+        ));
+        return normalizeAiVoiceResult(transcript, current, aiResult);
     }
 
     private Map<String, Object> normalizeAiVoiceResult(String transcript,

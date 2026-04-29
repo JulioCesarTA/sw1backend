@@ -50,6 +50,10 @@ public class WorkflowAiProxyService {
         return post("/form-voice-fill", body);
     }
 
+    public Map<String, Object> formVoiceDesign(Map<String, Object> body) {
+        return post("/form-voice-design", body);
+    }
+
     private Map<String, Object> post(String path, Map<String, Object> body) {
         try {
             String json = objectMapper.writeValueAsString(body);

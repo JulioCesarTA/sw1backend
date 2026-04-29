@@ -38,7 +38,6 @@ class TramiteServiceForwardingTest {
                 mock(JobRoleRepository.class),
                 mock(DepartmentRepository.class),
                 mock(UserRepository.class),
-                mock(VoiceFormFillService.class),
                 mock(WorkflowAiProxyService.class),
                 mock(FcmService.class),
                 mock(ReportRealtimeService.class)

@@ -3,6 +3,7 @@ package com.workflow.model;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Data
@@ -28,4 +29,7 @@ public class WorkflowNodo {
     private String trueLabel;
     private String falseLabel;
     private String condition;
+
+    @Transient
+    private FormDefinition formDefinition;
 }

@@ -33,4 +33,9 @@ public class WorkflowAiController {
     public ResponseEntity<Map<String, Object>> workySuggestions(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(workflowAiProxyService.workySuggestions(body));
     }
+
+    @PostMapping("/formularioporvoz")
+    public ResponseEntity<Map<String, Object>> formVoiceDesign(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(workflowAiProxyService.formVoiceDesign(body));
+    }
 }
