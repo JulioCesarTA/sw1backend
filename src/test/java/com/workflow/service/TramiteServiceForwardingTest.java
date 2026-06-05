@@ -10,6 +10,7 @@ import com.workflow.repository.UserRepository;
 import com.workflow.repository.WorkflowNodoRepository;
 import com.workflow.repository.WorkflowRepository;
 import com.workflow.repository.WorkflowTransitionRepository;
+import com.workflow.service.DocumentAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -38,6 +39,7 @@ class TramiteServiceForwardingTest {
                 mock(JobRoleRepository.class),
                 mock(DepartmentRepository.class),
                 mock(UserRepository.class),
+                mock(DocumentAccessService.class),
                 mock(WorkflowAiProxyService.class),
                 mock(FcmService.class),
                 mock(ReportRealtimeService.class)

@@ -47,6 +47,7 @@ public class TramiteService {
     private final JobRoleRepository jobRoleRepo;
     private final DepartmentRepository departmentRepo;
     private final UserRepository userRepository;
+    private final DocumentAccessService documentAccessService;
     private final WorkflowAiProxyService workflowAiProxyService;
     private final FcmService fcmService;
     private final ReportRealtimeService reportRealtimeService;
@@ -216,7 +217,7 @@ public class TramiteService {
                 .map(entry -> Map.entry(entry.getKey(), nodoMap.get(entry.getKey().getCurrentNodoId())))
                 .filter(entry -> entry.getValue() != null
                         && !isPassThroughNode(entry.getValue())
-                        && matchesNodoResponsibility(entry.getValue(), actor))
+                        && (matchesNodoResponsibility(entry.getValue(), actor) || documentAccessService.hasAnyAccess(entry.getValue(), actor)))
                 .map(entry -> {
                     Tramite tramite = entry.getKey();
                     WorkflowNodo nodo = entry.getValue();
@@ -246,7 +247,9 @@ public class TramiteService {
         }
 
         WorkflowNodo currentNodo = nodoRepo.findById(tramite.getCurrentNodoId()).orElse(null);
-        if (currentNodo == null || isPassThroughNode(currentNodo) || !matchesNodoResponsibility(currentNodo, actor)) {
+        boolean canAdvance = currentNodo != null && matchesNodoResponsibility(currentNodo, actor);
+        boolean hasDocumentAccess = currentNodo != null && documentAccessService.hasAnyAccess(currentNodo, actor);
+        if (currentNodo == null || isPassThroughNode(currentNodo) || (!canAdvance && !hasDocumentAccess)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a esta actividad");
         }
 
@@ -269,13 +272,15 @@ public class TramiteService {
         map.put("updatedAt", tramite.getUpdatedAt());
         map.put("history", history);
         map.put("formDefinition", formDefinition);
-        map.put("availableTransitions", buildAvailableTransitions(currentNodo, transitions));
+        map.put("availableTransitions", canAdvance ? buildAvailableTransitions(currentNodo, transitions) : List.of());
         map.put("incomingData", buildIncomingData(tramite, currentNodo, transitions));
+        map.put("canAdvance", canAdvance);
+        map.put("documentAccess", documentAccessService.resolvePermissions(currentNodo, actor));
         return map;
     }
 
-    public Map<String, Object> createAndSubmit(Map<String, Object> body, String requestedById) {
-        Tramite created = createInternal(body, requestedById);
+    public Map<String, Object> createAndSubmit(Map<String, Object> body, User requestedBy) {
+        Tramite created = createInternal(body, requestedBy);
         @SuppressWarnings("unchecked")
         List<String> autoTransitionIds = (List<String>) body.getOrDefault("autoTransitionIds", List.of());
 
@@ -293,14 +298,14 @@ public class TramiteService {
             if (Objects.equals(transitionId, autoTransitionIds.get(autoTransitionIds.size() - 1))) {
                 advanceBody.put("formData", body.get("formData"));
             }
-            latest = advanceInternal(created.getId(), advanceBody, requestedById, false);
+            latest = advanceInternal(created.getId(), advanceBody, requestedBy, false, false);
         }
 
         reportRealtimeService.scheduleDashboardUpdate();
         return latest != null ? latest : findOne(created.getId());
     }
 
-    private Tramite createInternal(Map<String, Object> body, String requestedById) {
+    private Tramite createInternal(Map<String, Object> body, User requestedBy) {
         Workflow workflow = workflowRepo.findById((String) body.get("workflowId"))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Workflow no encontrado"));
 
@@ -321,7 +326,7 @@ public class TramiteService {
         tramite.setDescription((String) body.get("description"));
         tramite.setWorkflowId(workflow.getId());
         tramite.setCurrentNodoId(initialNodo.getId());
-        tramite.setRequestedById(requestedById);
+        tramite.setRequestedById(requestedBy.getId());
         tramite.setStatus(Tramite.Status.PENDIENTE);
 
         @SuppressWarnings("unchecked")
@@ -329,7 +334,8 @@ public class TramiteService {
         tramite.setFormData(new LinkedHashMap<>(formData));
 
         Tramite saved = tramiteRepo.save(tramite);
-        recordHistory(saved.getId(), null, initialNodo.getId(), "CREADO", requestedById, "Tramite creado");
+        recordHistory(saved.getId(), null, initialNodo.getId(), "CREADO", requestedBy.getId(), "Tramite creado");
+        auditFileChanges(null, saved.getFormData(), saved, initialNodo, requestedBy);
         return saved;
     }
 
@@ -362,8 +368,8 @@ public class TramiteService {
         }
     }
 
-    public Map<String, Object> advance(String id, Map<String, Object> body, String userId) {
-        return advanceInternal(id, body, userId, true);
+    public Map<String, Object> advance(String id, Map<String, Object> body, User user) {
+        return advanceInternal(id, body, user, true, true);
     }
 
     public Map<String, Object> parseVoiceFill(String id, Map<String, Object> body, User actor) {
@@ -434,9 +440,14 @@ public class TramiteService {
         return result;
     }
 
-    private Map<String, Object> advanceInternal(String id, Map<String, Object> body, String userId, boolean publishReports) {
+    private Map<String, Object> advanceInternal(String id, Map<String, Object> body, User user, boolean publishReports, boolean enforceResponsibility) {
         Tramite tramite = tramiteRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tramite no encontrado"));
+        String userId = user.getId();
+        WorkflowNodo currentNodo = nodoRepo.findById(tramite.getCurrentNodoId()).orElse(null);
+        if (enforceResponsibility && (currentNodo == null || !matchesNodoResponsibility(currentNodo, user))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos para avanzar esta actividad");
+        }
 
         String transitionId = (String) body.get("transitionId");
         String[] transitionPath = transitionId == null ? new String[0] : transitionId.split(">>");
@@ -449,6 +460,8 @@ public class TramiteService {
         }
 
         String previousNodoId = tramite.getCurrentNodoId();
+        WorkflowNodo previousNodo = currentNodo;
+        Map<String, Object> previousFormData = tramite.getFormData() == null ? Map.of() : new LinkedHashMap<>(tramite.getFormData());
         AdvanceCursor advanceCursor = new AdvanceCursor(
                 transition,
                 nodoRepo.findById(transition.getToNodoId()).orElse(null),
@@ -470,6 +483,7 @@ public class TramiteService {
         @SuppressWarnings("unchecked")
         Map<String, Object> formData = (Map<String, Object>) body.get("formData");
         if (formData != null) {
+            ensureDocumentEditAllowed(previousNodo, previousFormData, formData, user);
             Map<String, Object> merged = new LinkedHashMap<>();
             if (tramite.getFormData() != null) merged.putAll(tramite.getFormData());
             merged.putAll(formData);
@@ -513,6 +527,7 @@ public class TramiteService {
         if (publishReports) {
             reportRealtimeService.scheduleDashboardUpdate();
         }
+        auditFileChanges(previousFormData, saved.getFormData(), saved, previousNodo, user);
         String responseTramiteId = saved.getId();
         if (saved.getParentTramiteId() != null && !tramiteRepo.existsById(saved.getId())) {
             responseTramiteId = saved.getParentTramiteId();
@@ -628,6 +643,79 @@ public class TramiteService {
     private String generateCode() {
         long count = tramiteRepo.count() + 1;
         return "TRM" + String.format("%05d", count);
+    }
+
+    private void ensureDocumentEditAllowed(WorkflowNodo nodo,
+                                           Map<String, Object> previousFormData,
+                                           Map<String, Object> incomingPatch,
+                                           User actor) {
+        if (nodo == null || actor == null || incomingPatch == null || incomingPatch.isEmpty()) {
+            return;
+        }
+        Map<String, List<DocumentAccessService.StoredFileReference>> previousByField = documentAccessService.extractStoredFiles(previousFormData).stream()
+                .collect(Collectors.groupingBy(DocumentAccessService.StoredFileReference::fieldName, LinkedHashMap::new, Collectors.toList()));
+
+        for (Map.Entry<String, Object> entry : incomingPatch.entrySet()) {
+            Map<String, Object> nextFieldMap = new LinkedHashMap<>();
+            nextFieldMap.put(entry.getKey(), entry.getValue());
+            List<DocumentAccessService.StoredFileReference> nextFiles = documentAccessService.extractStoredFiles(nextFieldMap).stream().toList();
+            if (nextFiles.isEmpty() && !previousByField.containsKey(entry.getKey())) {
+                continue;
+            }
+            List<DocumentAccessService.StoredFileReference> previousFiles = previousByField.getOrDefault(entry.getKey(), List.of());
+            boolean hasPrevious = !previousFiles.isEmpty();
+            boolean changed = !new LinkedHashSet<>(previousFiles).equals(new LinkedHashSet<>(nextFiles));
+            if (!changed) {
+                continue;
+            }
+            DocumentAccessService.PermissionType requiredPermission = hasPrevious
+                    ? DocumentAccessService.PermissionType.EDIT
+                    : DocumentAccessService.PermissionType.CREATE;
+            if (!documentAccessService.hasPermission(nodo, actor, requiredPermission)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos para modificar documentos en esta etapa");
+            }
+        }
+    }
+
+    private void auditFileChanges(Map<String, Object> previousFormData,
+                                  Map<String, Object> currentFormData,
+                                  Tramite tramite,
+                                  WorkflowNodo nodo,
+                                  User actor) {
+        if (tramite == null || nodo == null || actor == null) {
+            return;
+        }
+        Map<String, List<DocumentAccessService.StoredFileReference>> previousByField = documentAccessService.extractStoredFiles(previousFormData).stream()
+                .collect(Collectors.groupingBy(DocumentAccessService.StoredFileReference::fieldName, LinkedHashMap::new, Collectors.toList()));
+        Map<String, List<DocumentAccessService.StoredFileReference>> currentByField = documentAccessService.extractStoredFiles(currentFormData).stream()
+                .collect(Collectors.groupingBy(DocumentAccessService.StoredFileReference::fieldName, LinkedHashMap::new, Collectors.toList()));
+
+        Set<String> fields = new LinkedHashSet<>();
+        fields.addAll(previousByField.keySet());
+        fields.addAll(currentByField.keySet());
+
+        for (String fieldName : fields) {
+            List<DocumentAccessService.StoredFileReference> previousFiles = previousByField.getOrDefault(fieldName, List.of());
+            List<DocumentAccessService.StoredFileReference> currentFiles = currentByField.getOrDefault(fieldName, List.of());
+            Set<String> previousStoredNames = previousFiles.stream().map(DocumentAccessService.StoredFileReference::storedName).collect(Collectors.toSet());
+            Set<String> currentStoredNames = currentFiles.stream().map(DocumentAccessService.StoredFileReference::storedName).collect(Collectors.toSet());
+
+            for (DocumentAccessService.StoredFileReference file : currentFiles) {
+                if (previousStoredNames.contains(file.storedName())) {
+                    continue;
+                }
+                if (previousFiles.isEmpty()) {
+                    documentAccessService.recordCreated(tramite.getId(), tramite.getWorkflowId(), nodo.getId(), file, actor);
+                } else {
+                    documentAccessService.recordUpdated(tramite.getId(), tramite.getWorkflowId(), nodo.getId(), file, actor);
+                }
+            }
+            for (DocumentAccessService.StoredFileReference file : previousFiles) {
+                if (!currentStoredNames.contains(file.storedName())) {
+                    documentAccessService.recordDeleted(tramite.getId(), tramite.getWorkflowId(), nodo.getId(), file, actor);
+                }
+            }
+        }
     }
 
     private void recordHistory(String tramiteId, String fromNodoId, String toNodoId,

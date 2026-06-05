@@ -6,6 +6,9 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @Document(collection = "workflow_nodo")
@@ -29,7 +32,17 @@ public class WorkflowNodo {
     private String trueLabel;
     private String falseLabel;
     private String condition;
+    private List<DocumentPermission> documentPermissions = new ArrayList<>();
 
     @Transient
     private FormDefinition formDefinition;
+
+    @Data
+    @NoArgsConstructor
+    public static class DocumentPermission {
+        private String departmentId;
+        private boolean canCreate;
+        private boolean canRead;
+        private boolean canEdit;
+    }
 }

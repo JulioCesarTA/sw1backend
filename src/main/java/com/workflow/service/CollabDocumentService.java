@@ -1,0 +1,162 @@
+package com.workflow.service;
+
+import com.workflow.model.CollabDocument;
+import com.workflow.model.User;
+import com.workflow.repository.CollabDocumentRepository;
+import com.workflow.service.DocumentAccessService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class CollabDocumentService {
+
+    private final CollabDocumentRepository repository;
+    private final FileStorageService fileStorageService;
+    private final CollabExportService collabExportService;
+    private final DocumentAccessService documentAccessService;
+
+    public CollabDocument create(String tramiteId, String title, User actor) {
+        CollabDocument doc = new CollabDocument();
+        doc.setTramiteId(tramiteId);
+        doc.setCompanyId(actor.getCompanyId());
+        doc.setTitle(title != null && !title.isBlank() ? title.trim() : "Documento sin título");
+        doc.setCreatedBy(actor.getId());
+        doc.setCreatedByName(actor.getName());
+        doc.setYdocState(null);
+        doc.setTextSnapshot("");
+        return repository.save(doc);
+    }
+
+    public List<CollabDocument> listByTramite(String tramiteId) {
+        return repository.findByTramiteIdOrderByCreatedAtDesc(tramiteId);
+    }
+
+    public CollabDocument getById(String docId) {
+        CollabDocument doc = repository.findById(docId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento no encontrado"));
+        // Re-convert stale placeholder on direct load (e.g., page refresh)
+        if (isStaleInitialHtml(doc) && doc.getFileStoredName() != null && doc.getWorkflowId() != null) {
+            doc = reConvert(doc);
+        }
+        return doc;
+    }
+
+    private boolean isStaleInitialHtml(CollabDocument doc) {
+        String html = doc.getInitialHtml();
+        return html == null || html.isBlank() || html.contains("Vista previa no disponible");
+    }
+
+    private String convertFileToHtml(String storedName, String workflowId) {
+        try {
+            byte[] fileBytes = fileStorageService.readFileBytes(storedName, workflowId);
+            String lower = storedName.toLowerCase();
+            if (lower.endsWith(".docx")) return collabExportService.readDocxAsHtml(fileBytes);
+            if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) return collabExportService.readXlsxAsHtml(fileBytes);
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    private CollabDocument reConvert(CollabDocument doc) {
+        String html = convertFileToHtml(doc.getFileStoredName(), doc.getWorkflowId());
+        if (html.isBlank()) return doc;
+        doc.setInitialHtml(html);
+        doc.setUpdatedAt(Instant.now());
+        return repository.save(doc);
+    }
+
+    public void delete(String docId, User actor) {
+        CollabDocument doc = getById(docId);
+        boolean isOwner = actor.getId().equals(doc.getCreatedBy());
+        boolean isAdmin = actor.getRole() == User.Role.ADMIN || actor.getRole() == User.Role.SUPERADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para eliminar este documento");
+        }
+        repository.deleteById(docId);
+    }
+
+    public Map<String, Object> saveState(String docId, String ydocState, String textSnapshot) {
+        CollabDocument doc = getById(docId);
+        if (ydocState != null && !ydocState.isBlank()) {
+            doc.setYdocState(ydocState);
+        }
+        if (textSnapshot != null) {
+            doc.setTextSnapshot(textSnapshot);
+        }
+        doc.setUpdatedAt(Instant.now());
+        repository.save(doc);
+        return Map.of("ok", true);
+    }
+
+    /**
+     * Abre (o reutiliza) un CollabDocument vinculado a un archivo del trámite.
+     * Si ya existe un doc con ese fileStoredName en el tramite, lo devuelve directamente.
+     * Si no, convierte el archivo a HTML y crea un nuevo CollabDocument con ese contenido.
+     */
+    public CollabDocument openFile(String tramiteId, String storedName, String workflowId,
+                                   String title, User actor) {
+        Optional<CollabDocument> existing = repository.findByTramiteIdAndFileStoredName(tramiteId, storedName);
+
+        // Stale = initialHtml is the old fallback placeholder (ydocState may still have user edits).
+        // Updating initialHtml is safe because the editor only uses it when ydocState is empty.
+        boolean stale = existing.isPresent() && isStaleInitialHtml(existing.get());
+
+        if (existing.isPresent() && !stale) {
+            CollabDocument ex = existing.get();
+            // Registrar que alguien abrió el documento para colaborar
+            documentAccessService.recordCollabOpened(tramiteId, workflowId, storedName,
+                    ex.getTitle() != null ? ex.getTitle() : storedName, actor);
+            if (ex.getWorkflowId() == null && workflowId != null) {
+                ex.setWorkflowId(workflowId);
+                return repository.save(ex);
+            }
+            return ex;
+        }
+
+        String html = convertFileToHtml(storedName, workflowId);
+
+        if (stale) {
+            CollabDocument doc = existing.get();
+            doc.setInitialHtml(html);
+            doc.setWorkflowId(workflowId);
+            doc.setUpdatedAt(Instant.now());
+            return repository.save(doc);
+        }
+
+        String resolvedTitle = title != null && !title.isBlank() ? title : storedName;
+        documentAccessService.recordCollabOpened(tramiteId, workflowId, storedName, resolvedTitle, actor);
+
+        CollabDocument doc = new CollabDocument();
+        doc.setTramiteId(tramiteId);
+        doc.setCompanyId(actor.getCompanyId());
+        doc.setTitle(resolvedTitle);
+        doc.setCreatedBy(actor.getId());
+        doc.setCreatedByName(actor.getName());
+        doc.setFileStoredName(storedName);
+        doc.setWorkflowId(workflowId);
+        doc.setInitialHtml(html);
+        doc.setYdocState(null);
+        doc.setTextSnapshot("");
+        return repository.save(doc);
+    }
+
+    public Map<String, Object> toSummary(CollabDocument doc) {
+        return Map.of(
+                "id", doc.getId(),
+                "tramiteId", doc.getTramiteId() != null ? doc.getTramiteId() : "",
+                "title", doc.getTitle() != null ? doc.getTitle() : "",
+                "createdBy", doc.getCreatedBy() != null ? doc.getCreatedBy() : "",
+                "createdByName", doc.getCreatedByName() != null ? doc.getCreatedByName() : "",
+                "createdAt", doc.getCreatedAt() != null ? doc.getCreatedAt().toString() : "",
+                "updatedAt", doc.getUpdatedAt() != null ? doc.getUpdatedAt().toString() : ""
+        );
+    }
+}

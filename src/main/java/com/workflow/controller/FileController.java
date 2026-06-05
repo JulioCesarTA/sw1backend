@@ -1,11 +1,14 @@
 package com.workflow.controller;
 
 import com.workflow.service.FileStorageService;
+import com.workflow.model.User;
+import com.workflow.service.DocumentAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,23 +26,45 @@ import java.util.Map;
 public class FileController {
 
     private final FileStorageService fileStorageService;
+    private final DocumentAccessService documentAccessService;
 
     @PostMapping("/upload")
-    public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(fileStorageService.store(file));
+    public ResponseEntity<Map<String, Object>> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(name = "workflowId", required = false) String workflowId) {
+        return ResponseEntity.ok(fileStorageService.store(file, workflowId));
     }
 
     @GetMapping("/{storedName}/download")
     public ResponseEntity<?> download(@PathVariable String storedName,
-                                      @RequestParam(name = "filename", required = false) String filename) {
+                                      @RequestParam(name = "filename", required = false) String filename,
+                                      @RequestParam(name = "tramiteId", required = false) String tramiteId,
+                                      @RequestParam(name = "fieldName", required = false) String fieldName,
+                                      @RequestParam(name = "workflowId", required = false) String workflowId,
+                                      @AuthenticationPrincipal User user) {
+        String resolvedWorkflowId = workflowId;
+
+        if (tramiteId != null && !tramiteId.isBlank() && fieldName != null && !fieldName.isBlank()) {
+            DocumentAccessService.FileAccessContext fileContext = documentAccessService.requireFileAccess(
+                    tramiteId,
+                    fieldName,
+                    storedName,
+                    user,
+                    DocumentAccessService.PermissionType.READ
+            );
+            filename = filename == null || filename.isBlank() ? fileContext.file().fileName() : filename;
+            resolvedWorkflowId = fileContext.workflowId();
+            documentAccessService.recordRead(fileContext.tramiteId(), fileContext.workflowId(), fileContext.nodoId(), fileContext.file(), user);
+        }
+
         if (fileStorageService.isS3Available()) {
-            String signedUrl = fileStorageService.createPresignedDownloadUrl(storedName, filename);
+            String signedUrl = fileStorageService.createPresignedDownloadUrl(storedName, resolvedWorkflowId, filename);
             return ResponseEntity.status(HttpStatus.FOUND)
                     .header(HttpHeaders.LOCATION, URI.create(signedUrl).toString())
                     .build();
         }
 
-        byte[] data = fileStorageService.readLocalFile(storedName);
+        byte[] data = fileStorageService.readLocalFile(storedName, resolvedWorkflowId);
         String contentType = fileStorageService.detectContentType(storedName);
         String safeFilename = (filename == null || filename.isBlank()) ? storedName : filename.replace("\"", "");
         return ResponseEntity.ok()

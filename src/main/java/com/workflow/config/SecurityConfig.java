@@ -64,7 +64,6 @@ public class SecurityConfig {
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/workflow-ai/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/reports/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/files/*/download").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .anyRequest().authenticated()
             )

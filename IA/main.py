@@ -1,9 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, UploadFile
 
 from ai_common import load_dotenv_file
 from bottleneck_ai import analyze_bottlenecks
 from diagram_ai import process_diagram_command, process_diagram_voice_command
 from form_voice_ai import process_form_voice_design, process_form_voice_fill
+from report_ai import process_report_request
+from workflow_router_ai import process_workflow_router
 from worky_ai import analyze_worky_assistant
 
 
@@ -44,3 +46,17 @@ def form_voice_fill(body: dict):
 @app.post("/form-voice-design")
 def form_voice_design(body: dict):
     return process_form_voice_design(body)
+
+
+@app.post("/report-agent")
+def report_agent(body: dict):
+    return process_report_request(body)
+
+
+@app.post("/workflow-router")
+async def workflow_router(
+    prompt: str = Form(...),
+    companyId: str | None = Form(default=None),
+    files: list[UploadFile] | None = File(default=None),
+):
+    return process_workflow_router(prompt=prompt, company_id=companyId, files=files)

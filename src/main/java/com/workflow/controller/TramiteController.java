@@ -32,7 +32,7 @@ public class TramiteController {
     @PostMapping("/submit")
     public ResponseEntity<Map<String, Object>> createAndSubmit(@RequestBody Map<String, Object> body,
                                                                @AuthenticationPrincipal User user) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(tramiteService.createAndSubmit(body, user.getId()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(tramiteService.createAndSubmit(body, user));
     }
 
     @PostMapping("/voice-fill")

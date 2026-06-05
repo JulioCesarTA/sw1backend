@@ -37,7 +37,7 @@ public class ActivityController {
     public ResponseEntity<Map<String, Object>> advance(@PathVariable("id") String id,
                                                        @RequestBody Map<String, Object> body,
                                                        @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(tramiteService.advance(id, body, user.getId()));
+        return ResponseEntity.ok(tramiteService.advance(id, body, user));
     }
 
     @PostMapping("/{id}/voice-fill")

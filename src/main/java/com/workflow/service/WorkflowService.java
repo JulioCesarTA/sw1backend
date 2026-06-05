@@ -201,6 +201,9 @@ public class WorkflowService {
         if (body.containsKey("trueLabel")) nodo.setTrueLabel((String) body.get("trueLabel"));
         if (body.containsKey("falseLabel")) nodo.setFalseLabel((String) body.get("falseLabel"));
         if (body.containsKey("condition")) nodo.setCondition((String) body.get("condition"));
+        if (body.containsKey("documentPermissions")) {
+            nodo.setDocumentPermissions(mapDocumentPermissions(body.get("documentPermissions")));
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -433,6 +436,7 @@ public class WorkflowService {
             mapped.put("posX", nodo.getPosX());
             mapped.put("posY", nodo.getPosY());
             mapped.put("responsibleJobRoleId", nodo.getResponsibleJobRoleId());
+            mapped.put("documentPermissions", nodo.getDocumentPermissions() == null ? List.of() : nodo.getDocumentPermissions());
             FormDefinition formDefinition = formByNodo.get(nodo.getId());
             if (formDefinition != null) mapped.put("formDefinition", formDefinition);
             return mapped;
@@ -462,6 +466,31 @@ public class WorkflowService {
         if (actor.getCompanyId() == null || !actor.getCompanyId().equals(workflow.getCompanyId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a este workflow");
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<WorkflowNodo.DocumentPermission> mapDocumentPermissions(Object rawPermissions) {
+        if (!(rawPermissions instanceof List<?> items) || items.isEmpty()) {
+            return List.of();
+        }
+        List<WorkflowNodo.DocumentPermission> permissions = new ArrayList<>();
+        for (Object item : items) {
+            if (!(item instanceof Map<?, ?> rawMap)) {
+                continue;
+            }
+            Map<String, Object> map = (Map<String, Object>) rawMap;
+            String departmentId = map.get("departmentId") == null ? null : String.valueOf(map.get("departmentId")).trim();
+            if (departmentId == null || departmentId.isBlank()) {
+                continue;
+            }
+            WorkflowNodo.DocumentPermission permission = new WorkflowNodo.DocumentPermission();
+            permission.setDepartmentId(departmentId);
+            permission.setCanCreate(Boolean.TRUE.equals(map.get("canCreate")));
+            permission.setCanRead(Boolean.TRUE.equals(map.get("canRead")));
+            permission.setCanEdit(Boolean.TRUE.equals(map.get("canEdit")));
+            permissions.add(permission);
+        }
+        return permissions;
     }
 
 }

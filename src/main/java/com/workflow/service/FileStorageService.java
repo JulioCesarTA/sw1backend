@@ -80,7 +80,12 @@ public class FileStorageService {
         return s3Available;
     }
 
-    public Map<String, Object> store(MultipartFile file) {
+    /**
+     * Sube un archivo. Si se provee workflowId, el archivo queda en
+     * {keyPrefix}/{workflowId}/{uuid}.ext — una carpeta por workflow.
+     * Sin workflowId usa el nivel raíz (compatibilidad con archivos viejos).
+     */
+    public Map<String, Object> store(MultipartFile file, String workflowId) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Archivo vacio");
         }
@@ -92,25 +97,40 @@ public class FileStorageService {
         if (lastDot >= 0) extension = originalName.substring(lastDot);
 
         String storedName = UUID.randomUUID() + extension;
+        String folder = sanitizeFolder(workflowId);
 
         if (s3Available) {
-            storeS3(file, storedName);
+            storeS3(file, storedName, folder);
         } else {
-            storeLocal(file, storedName);
+            storeLocal(file, storedName, folder);
         }
 
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("fileName", originalName);
         meta.put("storedName", storedName);
+        meta.put("workflowId", folder != null ? workflowId : null);
         meta.put("contentType", file.getContentType());
         meta.put("size", file.getSize());
         meta.put("downloadPath", "/files/" + storedName + "/download");
         return meta;
     }
 
-    public String createPresignedDownloadUrl(String storedName, String filename) {
+    /** Retro-compatible: sin workflowId (archivos viejos o subida sin contexto). */
+    public Map<String, Object> store(MultipartFile file) {
+        return store(file, null);
+    }
+
+    /**
+     * Genera URL pre-firmada. Busca primero en la carpeta del workflow;
+     * si no existe (archivo viejo), cae al nivel raíz.
+     */
+    public String createPresignedDownloadUrl(String storedName, String workflowId, String filename) {
         if (!s3Available) return null;
-        String objectKey = keyPrefix + "/" + storedName;
+        String folder = sanitizeFolder(workflowId);
+        String objectKey = folder != null
+                ? keyPrefix + "/" + folder + "/" + storedName
+                : keyPrefix + "/" + storedName;
+
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(objectKey)
@@ -123,8 +143,21 @@ public class FileStorageService {
         return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 
-    public byte[] readLocalFile(String storedName) {
-        Path file = localUploadDir.resolve(storedName);
+    /** Retro-compatible: sin workflowId. */
+    public String createPresignedDownloadUrl(String storedName, String filename) {
+        return createPresignedDownloadUrl(storedName, null, filename);
+    }
+
+    public byte[] readLocalFile(String storedName, String workflowId) {
+        String folder = sanitizeFolder(workflowId);
+        Path file = folder != null
+                ? localUploadDir.resolve(folder).resolve(storedName)
+                : localUploadDir.resolve(storedName);
+
+        // Fallback a raíz si no se encuentra en la carpeta del workflow
+        if (!Files.exists(file)) {
+            file = localUploadDir.resolve(storedName);
+        }
         if (!Files.exists(file)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo no encontrado");
         }
@@ -133,6 +166,10 @@ public class FileStorageService {
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo leer el archivo");
         }
+    }
+
+    public byte[] readLocalFile(String storedName) {
+        return readLocalFile(storedName, null);
     }
 
     public String detectContentType(String storedName) {
@@ -145,9 +182,64 @@ public class FileStorageService {
         }
     }
 
-    private void storeS3(MultipartFile file, String storedName) {
+    /**
+     * Lee los bytes de un archivo desde S3 o local (para conversión inline).
+     */
+    /**
+     * Descarga los bytes de un archivo via URL pre-firmada (funciona sin s3:GetObject directo).
+     * Fallback a almacenamiento local si S3 no está disponible.
+     */
+    public byte[] readFileBytes(String storedName, String workflowId) {
+        if (s3Available) {
+            // Intentar con carpeta de workflow primero, luego raíz como fallback
+            String signedUrl = createPresignedDownloadUrl(storedName, workflowId, storedName);
+            try {
+                return downloadViaUrl(signedUrl);
+            } catch (Exception e) {
+                // Fallback sin workflowId (archivos viejos)
+                if (workflowId != null) {
+                    try {
+                        String rootUrl = createPresignedDownloadUrl(storedName, null, storedName);
+                        return downloadViaUrl(rootUrl);
+                    } catch (Exception ex) {
+                        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo no encontrado en S3");
+                    }
+                }
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo no encontrado en S3");
+            }
+        }
+        return readLocalFile(storedName, workflowId);
+    }
+
+    private byte[] downloadViaUrl(String urlStr) throws IOException {
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(urlStr).openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(10_000);
+        conn.setReadTimeout(30_000);
+        int status = conn.getResponseCode();
+        if (status == 302 || status == 301) {
+            String location = conn.getHeaderField("Location");
+            conn.disconnect();
+            conn = (java.net.HttpURLConnection) new java.net.URL(location).openConnection();
+            conn.setConnectTimeout(10_000);
+            conn.setReadTimeout(30_000);
+        }
+        if (conn.getResponseCode() >= 400) {
+            conn.disconnect();
+            throw new IOException("S3 responded with HTTP " + conn.getResponseCode());
+        }
+        try (InputStream in = conn.getInputStream()) {
+            return in.readAllBytes();
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    private void storeS3(MultipartFile file, String storedName, String folder) {
         try {
-            String objectKey = keyPrefix + "/" + storedName;
+            String objectKey = folder != null
+                    ? keyPrefix + "/" + folder + "/" + storedName
+                    : keyPrefix + "/" + storedName;
             PutObjectRequest request = PutObjectRequest.builder()
                     .bucket(bucketName).key(objectKey).contentType(file.getContentType()).build();
             s3Client.putObject(request, RequestBody.fromBytes(file.getBytes()));
@@ -158,13 +250,23 @@ public class FileStorageService {
         }
     }
 
-    private void storeLocal(MultipartFile file, String storedName) {
-        Path dest = localUploadDir.resolve(storedName);
-        try (InputStream in = file.getInputStream()) {
-            Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+    private void storeLocal(MultipartFile file, String storedName, String folder) {
+        try {
+            Path dir = folder != null ? localUploadDir.resolve(folder) : localUploadDir;
+            Files.createDirectories(dir);
+            Path dest = dir.resolve(storedName);
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo guardar el archivo localmente");
         }
+    }
+
+    private String sanitizeFolder(String workflowId) {
+        if (workflowId == null || workflowId.isBlank()) return null;
+        // Solo caracteres alfanuméricos y guiones para evitar path traversal
+        return workflowId.replaceAll("[^a-zA-Z0-9_-]", "_");
     }
 
     private String contentDisposition(String filename) {
