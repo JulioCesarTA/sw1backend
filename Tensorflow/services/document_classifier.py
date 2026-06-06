@@ -68,34 +68,12 @@ def _load_file_fields_from_workflows() -> list[str]:
 
 
 def _generate_training_texts(field_name: str) -> list[str]:
-    """
-    Genera variantes de texto de entrenamiento a partir del nombre del campo.
-    No usa ningún texto hardcodeado — todo viene del nombre real del campo.
-    """
     n = _normalize(field_name)
     words = [w for w in n.split() if len(w) > 2]
-
-    texts = [n]  # el nombre exacto
-
-    if words:
-        texts.append(" ".join(words))
-        texts.append("documento " + " ".join(words))
-        texts.append(" ".join(words) + " adjunto")
-        texts.append("archivo " + " ".join(words))
-        texts.append("copia " + " ".join(words))
-        texts.append("original " + " ".join(words))
-        texts.append(" ".join(words) + " requerido")
-        texts.append("presentar " + " ".join(words))
-        texts.append("adjuntar " + " ".join(words))
-        texts.append(" ".join(words) + " del solicitante")
-
-        # Variantes con palabras individuales
-        for w in words:
-            texts.append(w)
-            texts.append(f"{w} documento")
-            texts.append(f"certificado {w}")
-
-    return texts
+    if not words:
+        return [n]
+    joined = " ".join(words)
+    return [n, joined, f"documento {joined}", f"archivo {joined}", f"{joined} adjunto", f"adjuntar {joined}"]
 
 
 MAX_LEN  = 25

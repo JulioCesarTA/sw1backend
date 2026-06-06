@@ -44,6 +44,28 @@ public class WorkflowAiController {
         return ResponseEntity.ok(workflowAiProxyService.formVoiceDesign(body));
     }
 
+    @PostMapping("/nlp/report-generate")
+    public ResponseEntity<Map<String, Object>> reportGenerate(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(workflowAiProxyService.reportGenerate(body));
+    }
+
+    @PostMapping("/nlp/download")
+    public ResponseEntity<byte[]> reportDownload(@RequestBody Map<String, Object> body) {
+        return workflowAiProxyService.reportDownload(body);
+    }
+
+    @PostMapping("/nlp/fill-form")
+    public ResponseEntity<Map<String, Object>> fillForm(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(workflowAiProxyService.fillForm(body));
+    }
+
+    @PostMapping(value = "/match-with-docs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> matchWithDocs(
+            @RequestParam("text") String text,
+            @RequestParam(name = "files", required = false) List<MultipartFile> files) {
+        return ResponseEntity.ok(workflowAiProxyService.matchWithDocs(text, files));
+    }
+
     @PostMapping(value = "/asistente-clasificacion", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> workflowRouter(@RequestParam("prompt") String prompt,
                                                               @RequestParam(name = "files", required = false) List<MultipartFile> files,

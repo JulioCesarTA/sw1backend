@@ -82,49 +82,32 @@ class WorkflowMatcher:
                 for w in (raw if isinstance(raw, list) else [])
                 if w.get("id") and w.get("name")
             ]
-            logger.info(f"Workflows cargados desde API: {len(self.workflows)}")
         except Exception as e:
             logger.warning(f"No se pudieron cargar workflows: {e}")
             self.workflows = []
             return
 
         for w in self.workflows:
-            self._load_first_nodo_fields(w["id"])
+            wf_id = w["id"]
+            try:
+                nodos = sorted(api_get(f"/workflows/{wf_id}").get("nodo", []),
+                               key=lambda n: n.get("order", 9999))
+                required, optional = [], []
+                for nodo in nodos:
+                    if (nodo.get("nodeType") or "").lower() in ("inicio", "start", "fin", "end"):
+                        continue
+                    fields = (nodo.get("formDefinition") or {}).get("fields") or []
+                    file_fields = [f for f in fields if (f.get("type") or "").upper() == "FILE"]
+                    if not file_fields:
+                        continue
+                    required = [f["name"] for f in file_fields if f.get("required") or f.get("isRequired")]
+                    optional = [f["name"] for f in file_fields if not (f.get("required") or f.get("isRequired"))]
+                    break
+                self.field_requirements[wf_id] = {"required": required, "optional": optional}
+            except Exception:
+                self.field_requirements[wf_id] = {"required": [], "optional": []}
 
-        logger.info(f"Requisitos cargados: {len(self.workflows)} workflows configurados.")
-
-    def _load_first_nodo_fields(self, wf_id: str):
-        """Carga los campos FILE del primer nodo del workflow directamente desde Spring Boot."""
-        try:
-            full = api_get(f"/workflows/{wf_id}")
-
-            nodos = full.get("nodo", [])
-            nodos_sorted = sorted(nodos, key=lambda n: n.get("order", 9999))
-
-            required: list[str] = []
-            optional: list[str] = []
-
-            for nodo in nodos_sorted:
-                # Saltar nodo de inicio — no tiene formulario real
-                if (nodo.get("nodeType") or "").lower() in ("inicio", "start", "fin", "end"):
-                    continue
-                fd = nodo.get("formDefinition")
-                if not fd:
-                    continue
-                fields = fd.get("fields") or []
-                file_fields = [f for f in fields if (f.get("type") or "").upper() == "FILE"]
-                if not file_fields:
-                    continue
-                required = [f["name"] for f in file_fields if f.get("required") or f.get("isRequired")]
-                optional = [f["name"] for f in file_fields if not (f.get("required") or f.get("isRequired"))]
-                break  # Solo primer proceso con campos FILE
-
-            self.field_requirements[wf_id] = {"required": required, "optional": optional}
-            logger.debug(f"  {wf_id}: required={required}, optional={optional}")
-
-        except Exception as e:
-            logger.warning(f"No se pudieron cargar campos del workflow {wf_id}: {e}")
-            self.field_requirements[wf_id] = {"required": [], "optional": []}
+        logger.info(f"WorkflowMatcher: {len(self.workflows)} workflows cargados.")
 
     def _build_encoder(self):
         texts = [self._wf_text(w) for w in self.workflows]
@@ -195,47 +178,6 @@ class WorkflowMatcher:
                 "missingRequired": missing_req,
                 "presentOptional": present_opt,
                 "docsComplete":    len(missing_req) == 0 and len(required_fields) > 0,
-            })
-
-        return sorted(results, key=lambda x: x["score"], reverse=True)[:6]
-
-    # Mantener alias para compatibilidad con endpoint /nlp/match (solo texto)
-    def match_with_doc_types(self, user_text: str,
-                              doc_types: list[str],
-                              all_text:  str = "") -> list[dict]:
-        return self.match_with_doc_texts(user_text, [], all_text)
-
-    def match(self, user_text: str, user_docs: list[str] | None = None) -> list[dict]:
-        """Matching simple sin archivos (solo texto)."""
-        if not self.workflows or self.encoder is None:
-            return []
-
-        user_emb = self._encode(_normalize(user_text))
-        results  = []
-        for i, w in enumerate(self.workflows):
-            wid   = w["id"]
-            w_emb = self.wf_embeddings[i]
-            cos   = float(np.dot(user_emb, w_emb)
-                          / (np.linalg.norm(user_emb) * np.linalg.norm(w_emb) + 1e-8))
-
-            req            = self.field_requirements.get(wid, {})
-            required_fields = req.get("required", [])
-            optional_fields = req.get("optional", [])
-
-            total = min(1.0, max(0, cos))
-
-            results.append({
-                "workflowId":      wid,
-                "workflowName":    w["name"],
-                "score":           round(total * 100, 1),
-                "cosSim":          round(max(0, cos) * 100, 1),
-                "confidence":      self._confidence(total),
-                "requiredDocs":    required_fields,
-                "optionalDocs":    optional_fields,
-                "presentRequired": [],
-                "missingRequired": required_fields,
-                "presentOptional": [],
-                "docsComplete":    False,
             })
 
         return sorted(results, key=lambda x: x["score"], reverse=True)[:6]

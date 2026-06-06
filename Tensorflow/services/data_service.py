@@ -32,35 +32,23 @@ class DataService:
 
     def filter_rows(self, rows: list[dict], spec: dict) -> list[dict]:
         """Filtra y ordena los trámites en Python según el spec."""
-        from datetime import date as _date
         filters = spec.get("filters", {})
 
-        # Filter
         result = []
         for row in rows:
-            # departmentName — case-insensitive contains
             if filters.get("departmentName"):
                 dept_f = filters["departmentName"].lower()
                 dept_r = (row.get("departmentName") or "").lower()
                 if dept_f not in dept_r and dept_r not in dept_f:
                     continue
-            # workflowName
             if filters.get("workflowName"):
                 wf_f = filters["workflowName"].lower()
                 wf_r = (row.get("workflowName") or "").lower()
                 if wf_f not in wf_r and wf_r not in wf_f:
                     continue
-            # userName
-            if filters.get("userName"):
-                u_f = filters["userName"].lower()
-                u_r = (row.get("userName") or "").lower()
-                if u_f not in u_r and u_r not in u_f:
-                    continue
-            # status — exact
             if filters.get("status"):
                 if (row.get("status") or "").upper() != filters["status"].upper():
                     continue
-            # dateFrom / dateTo — compare against createdAt (ISO string)
             created = row.get("createdAt", "")
             if filters.get("dateFrom") and created:
                 if created[:10] < filters["dateFrom"]:
@@ -79,11 +67,10 @@ class DataService:
         return result
 
     def extract_context(self, rows: list[dict]) -> dict:
-        """Extrae nombres únicos de departamentos, workflows y usuarios de los datos."""
+        """Extrae nombres únicos de departamentos y workflows de los datos."""
         depts     = sorted({r.get("departmentName", "") for r in rows if r.get("departmentName")})
         workflows = sorted({r.get("workflowName", "") for r in rows if r.get("workflowName")})
-        users     = sorted({r.get("userName", "") for r in rows if r.get("userName")})
-        return {"departments": depts, "workflows": workflows, "users": users}
+        return {"departments": depts, "workflows": workflows, "users": []}
 
     def query(self, spec: dict) -> list[dict]:
         filters = spec.get("filters", {})
@@ -93,8 +80,6 @@ class DataService:
             params["departmentName"] = filters["departmentName"]
         if filters.get("status"):
             params["status"] = filters["status"]
-        if filters.get("userName"):
-            params["userName"] = filters["userName"]
         if filters.get("dateFrom"):
             params["dateFrom"] = filters["dateFrom"]
         if filters.get("dateTo"):

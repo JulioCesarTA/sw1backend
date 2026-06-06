@@ -67,6 +67,81 @@ public class WorkflowAiProxyService {
         return post("/form-voice-design", body);
     }
 
+    public Map<String, Object> reportGenerate(Map<String, Object> body) {
+        return post("/nlp/report-generate", body);
+    }
+
+    public Map<String, Object> fillForm(Map<String, Object> body) {
+        return post("/nlp/fill-form", body);
+    }
+
+    public org.springframework.http.ResponseEntity<byte[]> reportDownload(Map<String, Object> body) {
+        try {
+            String json = objectMapper.writeValueAsString(body);
+            Request request = new Request.Builder()
+                    .url(aiBaseUrl + "/nlp/download")
+                    .post(RequestBody.create(json, MediaType.parse("application/json; charset=utf-8")))
+                    .build();
+
+            try (Response response = okHttpClient.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    throw new ResponseStatusException(resolveStatus(response.code()), "Error del servicio de IA");
+                }
+                byte[] bytes = response.body() != null ? response.body().bytes() : new byte[0];
+                String contentType = response.header("Content-Type", "application/octet-stream");
+                String contentDisposition = response.header("Content-Disposition", "attachment");
+                return org.springframework.http.ResponseEntity.ok()
+                        .header("Content-Type", contentType)
+                        .header("Content-Disposition", contentDisposition)
+                        .body(bytes);
+            }
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo conectar con el servicio de IA: " + e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error proxy del servicio de IA: " + e.getMessage());
+        }
+    }
+
+    public Map<String, Object> matchWithDocs(String text, List<MultipartFile> files) {
+        try {
+            MultipartBody.Builder bodyBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM)
+                    .addFormDataPart("text", text == null ? "" : text);
+            if (files != null) {
+                for (MultipartFile file : files) {
+                    if (file == null || file.isEmpty()) continue;
+                    String filename = file.getOriginalFilename() == null ? "archivo" : file.getOriginalFilename();
+                    String mediaType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+                    bodyBuilder.addFormDataPart(
+                            "files",
+                            filename,
+                            RequestBody.create(file.getBytes(), MediaType.parse(mediaType))
+                    );
+                }
+            }
+
+            Request request = new Request.Builder()
+                    .url(aiBaseUrl + "/nlp/match-with-docs")
+                    .post(bodyBuilder.build())
+                    .build();
+
+            try (Response response = okHttpClient.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    throw new ResponseStatusException(resolveStatus(response.code()), response.body() != null ? response.body().string() : "Error del servicio de IA");
+                }
+                String responseBody = response.body() != null ? response.body().string() : "{}";
+                return objectMapper.readValue(responseBody, new TypeReference<>() {});
+            }
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo conectar con el servicio de IA: " + e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error proxy del servicio de IA: " + e.getMessage());
+        }
+    }
+
     public Map<String, Object> workflowRouter(String prompt, String companyId, List<MultipartFile> files) {
         try {
             MultipartBody.Builder bodyBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM)

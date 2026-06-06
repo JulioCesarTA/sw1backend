@@ -56,12 +56,9 @@ class WorkflowOptimizer:
         # 5. Calcular estadísticas por nodo
         node_stats = self._compute_node_stats(hist_by_tramite, tramite_status, nodes)
 
-        # 6. Calcular estadísticas por transición (caminos)
-        path_stats = self._compute_path_stats(hist_by_tramite, tramite_status, nodes, transitions)
-
-        # 7. Generar recomendaciones
+        # 6. Generar recomendaciones
         recommendations = self._generate_recommendations(
-            nodes, transitions, node_stats, path_stats, tramite_status
+            nodes, transitions, node_stats, tramite_status, hist_by_tramite
         )
 
         # 8. Resumen general
@@ -81,9 +78,8 @@ class WorkflowOptimizer:
                 "tasaExito":        f"{_pct(completados, total)}%",
                 "tiempoPromedioH":  round(avg_duration_h, 1),
             },
-            "nodeStats":        node_stats,
-            "pathStats":        path_stats,
-            "recommendations":  recommendations,
+            "nodeStats":       node_stats,
+            "recommendations": recommendations,
         }
 
     # ── Carga workflow ────────────────────────────────────────────────────
@@ -154,50 +150,6 @@ class WorkflowOptimizer:
 
         return sorted(result, key=lambda x: (x["overRatio"] or 0), reverse=True)
 
-    # ── Estadísticas por camino (transición) ──────────────────────────────
-
-    def _compute_path_stats(self, hist_by_tramite, tramite_status, nodes, transitions) -> list[dict]:
-        # Construir mapa de transiciones para lookup rápido
-        trans_map: dict[tuple, dict] = {}
-        for t in transitions:
-            key = (t.get("fromNodoId"), t.get("toNodoId"))
-            trans_map[key] = t
-
-        path_counts:     dict[tuple, int]         = defaultdict(int)
-        path_completions: dict[tuple, int]         = defaultdict(int)
-        path_durations:  dict[tuple, list[float]] = defaultdict(list)
-
-        for tramite_id, hist in hist_by_tramite.items():
-            status = tramite_status.get(tramite_id, "")
-            for entry in hist:
-                frm = entry.get("fromNodoId")
-                to  = entry.get("toNodoId")
-                if not frm or not to:
-                    continue
-                key = (frm, to)
-                path_counts[key] += 1
-                if status == "COMPLETADO":
-                    path_completions[key] += 1
-                dur = entry.get("durationInNodo")
-                if dur and dur > 0:
-                    path_durations[key].append(float(dur))
-
-        result = []
-        for (frm, to), count in path_counts.items():
-            trans_info = trans_map.get((frm, to), {})
-            result.append({
-                "fromNodoId":    frm,
-                "fromNodoName":  (nodes.get(frm) or {}).get("name", frm),
-                "toNodoId":      to,
-                "toNodoName":    (nodes.get(to) or {}).get("name", to),
-                "transitionName": trans_info.get("name", ""),
-                "count":         count,
-                "completionRate": _pct(path_completions.get((frm, to), 0), count),
-                "avgMinutes":    round(_avg(path_durations.get((frm, to), [])), 1),
-            })
-
-        return sorted(result, key=lambda x: x["count"], reverse=True)
-
     # ── Tiempo promedio de completado ─────────────────────────────────────
 
     def _avg_completion_time(self, hist_by_tramite, tramite_status) -> float:
@@ -216,200 +168,199 @@ class WorkflowOptimizer:
 
     # ── Generador de recomendaciones ──────────────────────────────────────
 
-    def _generate_recommendations(self, nodes, transitions, node_stats,
-                                   path_stats, tramite_status) -> list[dict]:
+    def _generate_recommendations(self, nodes, transitions, node_stats, tramite_status, hist_by_tramite) -> list[dict]:
         recs = []
-        total = len(tramite_status)
 
-        node_map  = {n["nodoId"]: n for n in node_stats}
-        path_map  = {(p["fromNodoId"], p["toNodoId"]): p for p in path_stats}
-
-        # Mapa de transiciones para análisis estructural
-        trans_from: dict[str, list] = defaultdict(list)  # fromNodoId → [transitions]
-        trans_to:   dict[str, list] = defaultdict(list)  # toNodoId → [transitions]
+        trans_from: dict[str, list] = defaultdict(list)
+        trans_single: dict[str, str] = {}
         for t in transitions:
             trans_from[t.get("fromNodoId", "")].append(t)
-            trans_to[t.get("toNodoId", "")].append(t)
+        for fid, lst in trans_from.items():
+            if len(lst) == 1:
+                trans_single[fid] = lst[0].get("toNodoId", "")
+
+        node_time    = {n["nodoId"]: n["avgMinutesReal"] for n in node_stats}
+        stats_by_id  = {n["nodoId"]: n for n in node_stats}
 
         # ── 1. Cuellos de botella ─────────────────────────────────────────
         for ns in node_stats:
             if ns["severity"] in ("ALTO", "CRITICO") and ns["visits"] >= 2:
-                over = ns["overRatio"]
                 extra_min = round(ns["avgMinutesReal"] - ns["avgMinutesExpected"], 1)
                 impacto_h = round(extra_min * ns["visits"] / 60, 1)
                 recs.append({
-                    "tipo":       "CUELLO_DE_BOTELLA",
-                    "prioridad":  "ALTA" if ns["severity"] == "CRITICO" else "MEDIA",
+                    "tipo":         "CUELLO_DE_BOTELLA",
+                    "prioridad":    "ALTA" if ns["severity"] == "CRITICO" else "MEDIA",
                     "nodoAfectado": ns["nodoName"],
-                    "explicacion": (
-                        f"El nodo '{ns['nodoName']}' está tardando {over}x más de lo "
-                        f"estimado ({ns['avgMinutesReal']} min reales vs "
-                        f"{ns['avgMinutesExpected']} min esperados). "
-                        f"En total ha generado {impacto_h}h de demora acumulada "
-                        f"en {ns['visits']} trámites."
+                    "explicacion":  (
+                        f"El nodo '{ns['nodoName']}' está tardando {ns['overRatio']}x más de lo "
+                        f"estimado ({ns['avgMinutesReal']} min reales vs {ns['avgMinutesExpected']} min esperados). "
+                        f"Generó {impacto_h}h de demora acumulada en {ns['visits']} trámites."
                     ),
                     "accion": (
-                        f"Revisá la carga de trabajo asignada a este nodo. "
-                        f"Si el tiempo real es consistentemente mayor al estimado, "
-                        f"ajustá el avgMinutes a {int(ns['avgMinutesReal'])} min "
+                        f"Ajustá el avgMinutes a {int(ns['avgMinutesReal'])} min "
                         f"o redistribuí la tarea entre más responsables."
                     ),
                     "tiempoAhorradoEstimadoH": impacto_h,
                     "confianza": min(0.95, 0.6 + ns["visits"] * 0.05),
                 })
 
-        # ── 2. Nodos de decisión con rama dominante ───────────────────────
-        decision_nodes = [n for n in nodes.values()
-                          if (n.get("nodeType") or "").lower() == "decision"]
-        for dn in decision_nodes:
-            dn_id    = dn["id"]
-            outgoing = trans_from.get(dn_id, [])
-            if len(outgoing) < 2:
-                continue
-
-            branch_stats = []
-            for t in outgoing:
-                key   = (dn_id, t.get("toNodoId"))
-                pdata = path_map.get(key, {})
-                branch_stats.append({
-                    "label":      t.get("name", ""),
-                    "toNodo":     (nodes.get(t.get("toNodoId", "")) or {}).get("name", ""),
-                    "toNodoId":   t.get("toNodoId", ""),
-                    "count":      pdata.get("count", 0),
-                    "completion": pdata.get("completionRate", 0),
-                    "avgMin":     pdata.get("avgMinutes", 0),
-                })
-
-            total_branch = sum(b["count"] for b in branch_stats)
-            if total_branch < 2:
-                continue
-
-            for b in branch_stats:
-                b["pct"] = _pct(b["count"], total_branch)
-
-            # Rama dominante (>= 75% de los casos)
-            dominant = max(branch_stats, key=lambda b: b["count"])
-            if dominant["pct"] >= 75 and len(branch_stats) == 2:
-                other = [b for b in branch_stats if b != dominant][0]
-                recs.append({
-                    "tipo":       "DECISION_DESBALANCEADA",
-                    "prioridad":  "MEDIA",
-                    "nodoAfectado": dn.get("name", ""),
-                    "explicacion": (
-                        f"En el nodo de decisión '{dn.get('name', '')}', "
-                        f"el {dominant['pct']}% de los trámites siempre toma "
-                        f"el camino '{dominant['label']}' hacia '{dominant['toNodo']}'. "
-                        f"Solo el {other['pct']}% va por '{other['label']}'. "
-                        f"Esto sugiere que la condición de decisión podría simplificarse."
-                    ),
-                    "accion": (
-                        f"Considerá si el nodo de decisión sigue siendo necesario. "
-                        f"Si el {dominant['pct']}% siempre toma el mismo camino, "
-                        f"podés conectar directamente al nodo '{dominant['toNodo']}' "
-                        f"y mover la excepción a un proceso separado. "
-                        f"Esto eliminaría un punto de espera innecesario para la mayoría."
-                    ),
-                    "tiempoAhorradoEstimadoH": None,
-                    "confianza": round(dominant["pct"] / 100, 2),
-                })
-
-        # ── 3. Nodos candidatos a bifurcación (paralelo) ──────────────────
-        # Detectar nodos consecutivos que no dependen entre sí
+        # ── 2. Bifurcación paralela ───────────────────────────────────────
         for nodo_id, outgoing_list in trans_from.items():
             if len(outgoing_list) < 2:
                 continue
             nodo = nodes.get(nodo_id)
             if not nodo:
                 continue
-            ntype = (nodo.get("nodeType") or "").lower()
-            # Si ya es bifurcación, no recomendar de nuevo
-            if ntype in ("bifurcasion", "bifurcacion"):
+            if (nodo.get("nodeType") or "").lower() in ("bifurcasion", "bifurcacion"):
                 continue
 
-            children_names = [
-                (nodes.get(t.get("toNodoId")) or {}).get("name", "?")
-                for t in outgoing_list
-            ]
-            # Calcular si ahorraría tiempo hacerlos en paralelo
-            child_times = []
-            for t in outgoing_list:
-                key   = (nodo_id, t.get("toNodoId", ""))
-                pdata = path_map.get(key, {})
-                child_times.append(pdata.get("avgMinutes", 0))
+            children_names = [(nodes.get(t.get("toNodoId")) or {}).get("name", "?") for t in outgoing_list]
+            child_times    = [node_time.get(t.get("toNodoId", ""), 0) for t in outgoing_list]
 
-            if len(child_times) >= 2 and sum(child_times) > 0:
+            if sum(child_times) > 0:
                 serial_min   = sum(child_times)
                 parallel_min = max(child_times)
                 saved_min    = serial_min - parallel_min
                 saved_h      = round(saved_min / 60, 1)
 
-                if saved_min >= 30:  # Solo recomendar si ahorra al menos 30 min
+                if saved_min >= 30:
                     recs.append({
-                        "tipo":       "AGREGAR_BIFURCACION",
-                        "prioridad":  "ALTA" if saved_h >= 2 else "MEDIA",
+                        "tipo":         "AGREGAR_BIFURCACION",
+                        "prioridad":    "ALTA" if saved_h >= 2 else "MEDIA",
                         "nodoAfectado": nodo.get("name", ""),
-                        "explicacion": (
-                            f"Después del nodo '{nodo.get('name', '')}', los nodos "
-                            f"{' y '.join(repr(n) for n in children_names)} se ejecutan "
-                            f"de forma secuencial ({serial_min} min en total). "
-                            f"Estos nodos podrían ejecutarse en paralelo ya que no dependen "
-                            f"entre sí, reduciendo el tiempo a {parallel_min} min."
+                        "explicacion":  (
+                            f"Después de '{nodo.get('name', '')}', los nodos "
+                            f"{' y '.join(repr(n) for n in children_names)} se ejecutan en serie "
+                            f"({serial_min} min). Podrían ejecutarse en paralelo reduciendo a {parallel_min} min."
                         ),
                         "accion": (
-                            f"Convertí el nodo '{nodo.get('name', '')}' en tipo "
-                            f"'bifurcación' o agregá un nodo de bifurcación después de él. "
-                            f"Conectá todos los nodos hijos a ese bifurcador y luego "
-                            f"agregá un nodo de unión al final para esperar que ambos completen."
+                            f"Convertí '{nodo.get('name', '')}' en tipo bifurcación y conectá "
+                            f"los nodos hijos en paralelo con un nodo de unión al final."
                         ),
                         "tiempoAhorradoEstimadoH": saved_h,
                         "confianza": 0.70,
                     })
 
-        # ── 4. Nodos casi nunca visitados (candidatos a eliminar) ──────────
-        for ns in node_stats:
-            if ns["visits"] == 0:
+        # ── 3. Reordenamiento de ruta (fail-fast) ────────────────────────
+        # Construir cadena lineal de nodos en orden
+        all_to  = {t.get("toNodoId") for t in transitions}
+        starts  = [fid for fid in trans_single if fid not in all_to]
+        chain: list[str] = []
+        cur = starts[0] if starts else None
+        seen: set = set()
+        while cur and cur not in seen:
+            seen.add(cur)
+            n = nodes.get(cur)
+            if n and (n.get("nodeType") or "").lower() not in ("inicio","fin","start","end"):
+                chain.append(cur)
+            cur = trans_single.get(cur)
+
+        for i in range(len(chain) - 1):
+            id_a = chain[i]
+            id_b = chain[i + 1]
+            sa   = stats_by_id.get(id_a)
+            sb   = stats_by_id.get(id_b)
+            if not sa or not sb:
                 continue
-            visit_pct = _pct(ns["visits"], total)
-            if visit_pct <= 10 and ns["visits"] >= 1:
-                recs.append({
-                    "tipo":       "NODO_POCO_USADO",
-                    "prioridad":  "BAJA",
-                    "nodoAfectado": ns["nodoName"],
-                    "explicacion": (
-                        f"El nodo '{ns['nodoName']}' solo fue visitado en el "
-                        f"{visit_pct}% de los trámites ({ns['visits']} de {total}). "
-                        f"Posiblemente sea un nodo de excepción o esté desconectado del flujo principal."
-                    ),
-                    "accion": (
-                        f"Verificá si este nodo sigue siendo necesario. "
-                        f"Si raramente se usa, considerá moverlo a un sub-proceso "
-                        f"separado o eliminarlo para simplificar el diagrama."
-                    ),
-                    "tiempoAhorradoEstimadoH": None,
-                    "confianza": 0.55,
-                })
+            if sa["visits"] < 3 or sb["visits"] < 3:
+                continue
 
-        # ── 5. Nodos con alta tasa de rechazo ─────────────────────────────
-        for ns in node_stats:
-            if ns["visits"] >= 3 and ns["rejectionRate"] >= 40:
-                recs.append({
-                    "tipo":       "ALTA_TASA_RECHAZO",
-                    "prioridad":  "ALTA",
-                    "nodoAfectado": ns["nodoName"],
-                    "explicacion": (
-                        f"El {ns['rejectionRate']}% de los trámites que pasan por "
-                        f"'{ns['nodoName']}' terminan siendo rechazados. "
-                        f"Esto indica que los trámites llegan a este nodo sin cumplir "
-                        f"los requisitos necesarios."
-                    ),
-                    "accion": (
-                        f"Agregá un nodo de validación o decisión ANTES de "
-                        f"'{ns['nodoName']}' que verifique los requisitos mínimos. "
-                        f"Así los trámites incompletos se devuelven al inicio del flujo "
-                        f"antes de llegar a esta etapa crítica."
-                    ),
-                    "tiempoAhorradoEstimadoH": None,
-                    "confianza": min(0.90, 0.5 + ns["visits"] * 0.05),
-                })
+            # fail-fast: B rechaza más y cuesta menos que A → conviene poner B antes
+            if (sb["rejectionRate"] > sa["rejectionRate"] + 10
+                    and sb["avgMinutesReal"] > 0
+                    and sa["avgMinutesReal"] > sb["avgMinutesReal"] * 1.4):
+                casos_rechazados = round(sa["visits"] * sb["rejectionRate"] / 100)
+                saved_min = casos_rechazados * sa["avgMinutesReal"]
+                saved_h   = round(saved_min / 60, 1)
+                if saved_h >= 0.3:
+                    recs.append({
+                        "tipo":         "REORDENAR_RUTA",
+                        "prioridad":    "ALTA" if saved_h >= 2 else "MEDIA",
+                        "nodoAfectado": sa["nodoName"],
+                        "explicacion":  (
+                            f"'{sb['nodoName']}' rechaza el {sb['rejectionRate']}% de los trámites "
+                            f"en solo {sb['avgMinutesReal']} min, pero está DESPUÉS de "
+                            f"'{sa['nodoName']}' que tarda {sa['avgMinutesReal']} min. "
+                            f"Se están procesando {casos_rechazados} trámites que van a ser rechazados "
+                            f"gastando {sa['avgMinutesReal']} min innecesarios en '{sa['nodoName']}'."
+                        ),
+                        "accion": (
+                            f"Cambiar conexión: ... → '{sb['nodoName']}' → '{sa['nodoName']}' → ... "
+                            f"Poner primero el filtro más rápido y estricto ahorra ~{saved_h}h acumuladas."
+                        ),
+                        "conexionSugerida": {
+                            "conectar":  sb["nodoName"],
+                            "antes_de":  sa["nodoName"],
+                            "razon":     f"fail-fast: '{sb['nodoName']}' filtra {sb['rejectionRate']}% en {sb['avgMinutesReal']} min vs {sa['avgMinutesReal']} min de '{sa['nodoName']}'"
+                        },
+                        "tiempoAhorradoEstimadoH": saved_h,
+                        "confianza": min(0.90, 0.55 + sa["visits"] * 0.04),
+                    })
 
-        return sorted(recs, key=lambda r: {"ALTA": 0, "MEDIA": 1, "BAJA": 2}[r["prioridad"]])
+        # ── 4. Ruta óptima observada ──────────────────────────────────────
+        ruta_optima = self._find_fastest_route(hist_by_tramite, tramite_status, nodes)
+        if ruta_optima:
+            recs.append(ruta_optima)
+
+        return sorted(recs, key=lambda r: {"ALTA": 0, "MEDIA": 1, "BAJA": 2}.get(r.get("prioridad","BAJA"), 2))
+
+    # ── Ruta óptima observada ─────────────────────────────────────────────
+
+    def _find_fastest_route(self, hist_by_tramite, tramite_status, nodes) -> dict | None:
+        rutas: list[tuple[list[str], float]] = []  # (secuencia de nombres, horas)
+
+        for tramite_id, hist in hist_by_tramite.items():
+            if tramite_status.get(tramite_id) != "COMPLETADO":
+                continue
+
+            sorted_hist = sorted(hist, key=lambda h: h.get("changedAt") or datetime.min)
+            secuencia   = []
+            total_min   = 0.0
+
+            for h in sorted_hist:
+                nid = h.get("toNodoId")
+                if not nid:
+                    continue
+                n = nodes.get(nid)
+                if not n:
+                    continue
+                if (n.get("nodeType") or "").lower() in ("inicio","fin","start","end"):
+                    continue
+                secuencia.append(n.get("name", nid))
+                dur = h.get("durationInNodo") or 0
+                total_min += dur
+
+            if secuencia and total_min > 0:
+                rutas.append((secuencia, total_min / 60))
+
+        if len(rutas) < 2:
+            return None
+
+        rutas.sort(key=lambda x: x[1])
+        mas_rapida = rutas[0]
+        mas_lenta  = rutas[-1]
+        promedio_h = _avg([r[1] for r in rutas])
+
+        return {
+            "tipo":      "RUTA_OPTIMA",
+            "prioridad": "MEDIA",
+            "nodoAfectado": " → ".join(mas_rapida[0]),
+            "explicacion": (
+                f"La ruta más rápida observada completa el trámite en {round(mas_rapida[1], 1)}h: "
+                f"{' → '.join(mas_rapida[0])}. "
+                f"La más lenta tardó {round(mas_lenta[1], 1)}h. "
+                f"Promedio general: {round(promedio_h, 1)}h."
+            ),
+            "accion": (
+                f"Revisá si la secuencia '{' → '.join(mas_rapida[0])}' puede ser el camino estándar. "
+                f"Eliminá pasos opcionales o mové nodos lentos al final del flujo."
+            ),
+            "conexionSugerida": {
+                "secuencia_optima": mas_rapida[0],
+                "tiempo_optimo_h":  round(mas_rapida[1], 1),
+                "tiempo_promedio_h": round(promedio_h, 1),
+                "ahorro_vs_lento_h": round(mas_lenta[1] - mas_rapida[1], 1),
+            },
+            "tiempoAhorradoEstimadoH": round(mas_lenta[1] - mas_rapida[1], 1),
+            "confianza": min(0.85, 0.5 + len(rutas) * 0.05),
+        }
