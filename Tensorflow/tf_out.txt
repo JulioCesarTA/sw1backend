@@ -1,3 +1,0 @@
-INFO:     127.0.0.1:62003 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:53836 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:53838 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
