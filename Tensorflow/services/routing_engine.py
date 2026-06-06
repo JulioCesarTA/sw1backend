@@ -12,52 +12,17 @@ Todos los modelos se entrenan con datos reales obtenidos desde Spring Boot API.
 
 import logging
 import os
-import requests
 from datetime import datetime, timezone
 
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
+from services.api_client import refresh_token as _get_token, api_get as _get
+
 logger = logging.getLogger(__name__)
 
-SPRING_API     = os.getenv("SPRING_API_URL", "http://localhost:8080/api")
-SPRING_EMAIL   = os.getenv("SPRING_EMAIL",   "juan@gmail.com")
-SPRING_PASSWORD= os.getenv("SPRING_PASSWORD","julioavila")
-
 MAX_SEQ = 8   # máximo de nodos en secuencia para LSTM
-
-
-# ───────────────────────────────────────────────────────────────────────────
-# Auth helper
-# ───────────────────────────────────────────────────────────────────────────
-_token: str = ""
-
-def _get_token() -> str:
-    global _token
-    try:
-        r = requests.post(f"{SPRING_API}/auth/login",
-                          json={"email": SPRING_EMAIL, "password": SPRING_PASSWORD},
-                          timeout=8)
-        r.raise_for_status()
-        d = r.json()
-        _token = d.get("accessToken") or d.get("token") or ""
-    except Exception as e:
-        logger.warning(f"RoutingEngine: no se pudo obtener token: {e}")
-        _token = ""
-    return _token
-
-def _headers() -> dict:
-    tok = _token or _get_token()
-    return {"Authorization": f"Bearer {tok}"} if tok else {}
-
-def _get(path: str) -> list | dict:
-    r = requests.get(f"{SPRING_API}{path}", headers=_headers(), timeout=15)
-    if r.status_code == 401:
-        _get_token()
-        r = requests.get(f"{SPRING_API}{path}", headers=_headers(), timeout=15)
-    r.raise_for_status()
-    return r.json()
 
 
 # ───────────────────────────────────────────────────────────────────────────

@@ -10,47 +10,12 @@ Fuentes de datos:
 """
 
 import logging
-import os
-import requests
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from pymongo import MongoClient
+from services.api_client import api_get, get_mongo_db
 
 logger = logging.getLogger(__name__)
-
-SPRING_API      = os.getenv("SPRING_API_URL", "http://localhost:8080/api")
-SPRING_EMAIL    = os.getenv("SPRING_EMAIL",   "juan@gmail.com")
-SPRING_PASSWORD = os.getenv("SPRING_PASSWORD","julioavila")
-MONGO_URI       = os.getenv("MONGODB_URI",    "mongodb://localhost:27017")
-MONGO_DB        = os.getenv("MONGODB_DB",     "workflow_db")
-
-_token: str = ""
-
-
-# ── Auth ──────────────────────────────────────────────────────────────────
-def _get_token() -> str:
-    global _token
-    try:
-        r = requests.post(f"{SPRING_API}/auth/login",
-                          json={"email": SPRING_EMAIL, "password": SPRING_PASSWORD},
-                          timeout=8)
-        r.raise_for_status()
-        d = r.json()
-        _token = d.get("accessToken") or d.get("token") or ""
-    except Exception as e:
-        logger.warning(f"WorkflowOptimizer auth: {e}")
-    return _token
-
-def _headers() -> dict:
-    tok = _token or _get_token()
-    return {"Authorization": f"Bearer {tok}"} if tok else {}
-
-
-# ── MongoDB ───────────────────────────────────────────────────────────────
-def _get_db():
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=8000)
-    return client[MONGO_DB]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
@@ -61,8 +26,6 @@ def _pct(a, b): return round(a / b * 100, 1) if b else 0
 class WorkflowOptimizer:
 
     def analyze(self, workflow_id: str) -> dict:
-        _get_token()
-
         # 1. Estructura del workflow (nodos + transiciones)
         wf = self._load_workflow(workflow_id)
         if not wf:
@@ -72,7 +35,7 @@ class WorkflowOptimizer:
         transitions = wf.get("transitions", [])
 
         # 2. Tramites de este workflow
-        db       = _get_db()
+        db       = get_mongo_db()
         tramites = list(db["tramites"].find({"workflowId": workflow_id}))
         if not tramites:
             return {"error": "Sin trámites históricos para analizar"}
@@ -127,14 +90,7 @@ class WorkflowOptimizer:
 
     def _load_workflow(self, wf_id: str) -> dict | None:
         try:
-            r = requests.get(f"{SPRING_API}/workflows/{wf_id}",
-                             headers=_headers(), timeout=10)
-            if r.status_code == 401:
-                _get_token()
-                r = requests.get(f"{SPRING_API}/workflows/{wf_id}",
-                                 headers=_headers(), timeout=10)
-            r.raise_for_status()
-            return r.json()
+            return api_get(f"/workflows/{wf_id}")
         except Exception as e:
             logger.error(f"No se pudo cargar workflow {wf_id}: {e}")
             return None

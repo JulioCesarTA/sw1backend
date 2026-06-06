@@ -5,81 +5,13 @@ Three IA models:
   - BottleneckPredictor : which nodes are likely bottlenecks
   - PriorityRanker      : rank active tramites by urgency (avgMinutes = SLA proxy)
 """
-import os, logging
+import logging
 import numpy as np
-import requests
 from datetime import datetime
-from dotenv import load_dotenv
-import pymongo
 
-load_dotenv()
-
-MONGO_URI    = os.getenv("MONGODB_URI", "")
-SPRING_API   = os.getenv("SPRING_API_URL", "http://localhost:8080/api")
-SPRING_EMAIL = os.getenv("SPRING_EMAIL", "juan@gmail.com")
-SPRING_PASS  = os.getenv("SPRING_PASSWORD", "julioavila")
+from services.api_client import get_mongo_db, load_workflows
 
 logger = logging.getLogger(__name__)
-
-
-def _spring_headers() -> dict:
-    try:
-        r = requests.post(
-            f"{SPRING_API}/auth/login",
-            json={"email": SPRING_EMAIL, "password": SPRING_PASS},
-            timeout=5,
-        )
-        token = r.json().get("accessToken", "")
-        return {"Authorization": f"Bearer {token}"}
-    except Exception as e:
-        logger.error(f"Spring Boot auth failed: {e}")
-        return {}
-
-
-def _load_wf_data(headers: dict) -> tuple:
-    """
-    Returns (wf_map, nodo_map):
-      wf_map  : {wfId -> {name, nodos, num_nodos, total_expected_min}}
-      nodo_map: {nodoId -> {avgMinutes, order, total_nodos, wfId, name}}
-    """
-    try:
-        wf_list = requests.get(f"{SPRING_API}/workflows", headers=headers, timeout=10).json()
-    except Exception as e:
-        logger.error(f"Could not load workflows: {e}")
-        return {}, {}
-
-    wf_map, nodo_map = {}, {}
-
-    for wf in wf_list:
-        wid = wf["id"]
-        try:
-            full = requests.get(f"{SPRING_API}/workflows/{wid}", headers=headers, timeout=10).json()
-        except Exception:
-            continue
-
-        all_nodos = sorted(full.get("nodo", []), key=lambda n: n.get("order", 999))
-        nodos = [n for n in all_nodos
-                 if (n.get("nodeType") or "").lower() not in ("inicio", "fin", "start", "end")]
-
-        total_min = sum(n.get("avgMinutes") or 30 for n in nodos)
-        wf_map[wid] = {
-            "name":               wf.get("name", ""),
-            "nodos":              nodos,
-            "num_nodos":          len(nodos),
-            "total_expected_min": max(total_min, 1),
-        }
-
-        for i, n in enumerate(nodos):
-            nodo_map[n["id"]] = {
-                "avgMinutes":  n.get("avgMinutes") or 30,
-                "order":       i,
-                "total_nodos": len(nodos),
-                "wfId":        wid,
-                "name":        n.get("name", "Nodo"),
-            }
-
-    logger.info(f"Workflows: {len(wf_map)}, nodos: {len(nodo_map)}")
-    return wf_map, nodo_map
 
 
 def _naive_dt(dt) -> datetime:
@@ -113,13 +45,10 @@ class DelayPredictor:
         import tensorflow as tf
         self._tf = tf
 
-        headers = _spring_headers()
-        self._wf_map, _ = _load_wf_data(headers)
+        self._wf_map, _ = load_workflows()
 
-        client = pymongo.MongoClient(MONGO_URI)
-        db = client["workflow_db"]
+        db = get_mongo_db()
         self._model, self._wf_delay_rate = self._train(db)
-        client.close()
         logger.info("DelayPredictor ready")
 
     # ── training ──────────────────────────────────────────────────────────
@@ -256,13 +185,10 @@ class BottleneckPredictor:
         import tensorflow as tf
         self._tf = tf
 
-        headers = _spring_headers()
-        self._wf_map, self._nodo_map = _load_wf_data(headers)
+        self._wf_map, self._nodo_map = load_workflows()
 
-        client = pymongo.MongoClient(MONGO_URI)
-        db = client["workflow_db"]
+        db = get_mongo_db()
         self._model, self._node_overtime, self._node_visits = self._train(db)
-        client.close()
         logger.info("BottleneckPredictor ready")
 
     # ── training ──────────────────────────────────────────────────────────
@@ -410,9 +336,8 @@ class PriorityRanker:
     """
 
     def __init__(self):
-        headers = _spring_headers()
-        self._wf_map, _ = _load_wf_data(headers)
-        self._db = pymongo.MongoClient(MONGO_URI)["workflow_db"]
+        self._wf_map, _ = load_workflows()
+        self._db = get_mongo_db()
         logger.info(f"PriorityRanker ready. Workflows: {len(self._wf_map)}")
 
     def rank(self) -> list:

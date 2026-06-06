@@ -9,41 +9,15 @@ Entrenados con datos reales de la BD:
 import logging
 import os
 import re
-import requests
 import numpy as np
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 from tensorflow import keras
 
+from services.api_client import api_get
+
 logger = logging.getLogger(__name__)
-
-SPRING_API      = os.getenv("SPRING_API_URL", "http://localhost:8080/api")
-SPRING_EMAIL    = os.getenv("SPRING_EMAIL",   "juan@gmail.com")
-SPRING_PASSWORD = os.getenv("SPRING_PASSWORD","julioavila")
-
-# ──────────────────────────────────────────────────────────────────────────
-# Auth
-# ──────────────────────────────────────────────────────────────────────────
-_token: str = ""
-
-def _get_token() -> str:
-    global _token
-    try:
-        r = requests.post(f"{SPRING_API}/auth/login",
-                          json={"email": SPRING_EMAIL, "password": SPRING_PASSWORD},
-                          timeout=8)
-        r.raise_for_status()
-        d = r.json()
-        _token = d.get("accessToken") or d.get("token") or ""
-    except Exception as e:
-        logger.warning(f"NLPService auth: {e}")
-        _token = ""
-    return _token
-
-def _headers() -> dict:
-    tok = _token or _get_token()
-    return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 # ──────────────────────────────────────────────────────────────────────────
 # Real context loader
@@ -55,19 +29,11 @@ def _load_real_entities() -> tuple[list[str], list[str], list[str], list[str]]:
     depts, workflows, users = [], [], []
     statuses = ["COMPLETADO", "PENDIENTE", "EN_PROGRESO", "RECHAZADO", "APROBADO"]
     try:
-        _get_token()
-        r = requests.get(f"{SPRING_API}/tramites/report-data",
-                         headers=_headers(), timeout=15)
-        if r.status_code == 401:
-            _get_token()
-            r = requests.get(f"{SPRING_API}/tramites/report-data",
-                             headers=_headers(), timeout=15)
-        r.raise_for_status()
-        rows = r.json() if isinstance(r.json(), list) else []
-
-        depts     = sorted({row.get("departmentName") or "" for row in rows if row.get("departmentName")})
-        workflows = sorted({row.get("workflowName")   or "" for row in rows if row.get("workflowName")})
-        users     = sorted({row.get("userName")        or "" for row in rows if row.get("userName")})
+        data = api_get("/tramites/report-data")
+        rows = data if isinstance(data, list) else []
+        depts     = sorted({r.get("departmentName") or "" for r in rows if r.get("departmentName")})
+        workflows = sorted({r.get("workflowName")   or "" for r in rows if r.get("workflowName")})
+        users     = sorted({r.get("userName")        or "" for r in rows if r.get("userName")})
         logger.info(f"NLPService: entidades reales — {len(depts)} depts, "
                     f"{len(workflows)} workflows, {len(users)} usuarios.")
     except Exception as e:

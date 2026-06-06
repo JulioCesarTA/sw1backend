@@ -11,39 +11,15 @@ import json
 import logging
 import os
 import re
-import requests
 import numpy as np
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 from tensorflow import keras
 
+from services.api_client import api_get, refresh_token
+
 logger = logging.getLogger(__name__)
-
-SPRING_API = os.getenv("SPRING_API_URL", "http://localhost:8080/api")
-
-_token: str = ""
-
-
-def _get_token() -> str:
-    global _token
-    try:
-        r = requests.post(f"{SPRING_API}/auth/login",
-                          json={"email": os.getenv("SPRING_EMAIL", "juan@gmail.com"),
-                                "password": os.getenv("SPRING_PASSWORD", "julioavila")},
-                          timeout=8)
-        r.raise_for_status()
-        data = r.json()
-        _token = data.get("token") or data.get("accessToken") or ""
-    except Exception as e:
-        logger.warning(f"WorkflowMatcher: no se pudo obtener token: {e}")
-        _token = ""
-    return _token
-
-
-def _headers() -> dict:
-    tok = _token or _get_token()
-    return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 
 def _normalize(text: str) -> str:
@@ -86,7 +62,7 @@ class WorkflowMatcher:
         self.encoder    = None
         self.wf_embeddings: list[np.ndarray] = []
 
-        _get_token()
+        refresh_token()
         self._load_workflows()
 
         if self.workflows:
@@ -98,12 +74,7 @@ class WorkflowMatcher:
     # ------------------------------------------------------------------ #
     def _load_workflows(self):
         try:
-            r = requests.get(f"{SPRING_API}/workflows", headers=_headers(), timeout=10)
-            if r.status_code == 401:
-                _get_token()
-                r = requests.get(f"{SPRING_API}/workflows", headers=_headers(), timeout=10)
-            r.raise_for_status()
-            raw = r.json()
+            raw = api_get("/workflows")
             if isinstance(raw, str):
                 raw = json.loads(raw)
             self.workflows = [
@@ -117,7 +88,6 @@ class WorkflowMatcher:
             self.workflows = []
             return
 
-        # Para cada workflow, cargar nodos + fields del primer nodo con formulario
         for w in self.workflows:
             self._load_first_nodo_fields(w["id"])
 
@@ -126,12 +96,7 @@ class WorkflowMatcher:
     def _load_first_nodo_fields(self, wf_id: str):
         """Carga los campos FILE del primer nodo del workflow directamente desde Spring Boot."""
         try:
-            r = requests.get(f"{SPRING_API}/workflows/{wf_id}", headers=_headers(), timeout=10)
-            if r.status_code == 401:
-                _get_token()
-                r = requests.get(f"{SPRING_API}/workflows/{wf_id}", headers=_headers(), timeout=10)
-            r.raise_for_status()
-            full = r.json()
+            full = api_get(f"/workflows/{wf_id}")
 
             nodos = full.get("nodo", [])
             nodos_sorted = sorted(nodos, key=lambda n: n.get("order", 9999))

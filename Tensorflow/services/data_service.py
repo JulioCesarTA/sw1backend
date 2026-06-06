@@ -5,37 +5,10 @@ No requiere conexion directa a MongoDB.
 """
 
 import logging
-import os
-import requests
+
+from services.api_client import api_get, refresh_token
 
 logger = logging.getLogger(__name__)
-
-SPRING_API = os.getenv("SPRING_API_URL", "http://localhost:8080/api")
-SPRING_EMAIL = os.getenv("SPRING_EMAIL", "juan@gmail.com")
-SPRING_PASSWORD = os.getenv("SPRING_PASSWORD", "julioavila")
-
-_token: str = ""
-
-
-def _get_token() -> str:
-    global _token
-    try:
-        r = requests.post(f"{SPRING_API}/auth/login",
-                          json={"email": SPRING_EMAIL, "password": SPRING_PASSWORD},
-                          timeout=8)
-        r.raise_for_status()
-        data = r.json()
-        _token = data.get("token") or data.get("accessToken") or data.get("jwt") or ""
-        logger.info("DataService: token JWT obtenido.")
-    except Exception as e:
-        logger.warning(f"DataService: no se pudo obtener token: {e}")
-        _token = ""
-    return _token
-
-
-def _headers() -> dict:
-    tok = _token or _get_token()
-    return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 
 class DataService:
@@ -43,18 +16,13 @@ class DataService:
 
     def __init__(self):
         self.db = None   # Compatibilidad — WorkflowMatcher recibe esto
-        _get_token()
+        refresh_token()
         logger.info("DataService listo (via Spring Boot API).")
 
     def get_all_enriched(self) -> list[dict]:
         """Obtiene todos los trámites enriquecidos (workflowName, departmentName, etc.) desde Spring Boot."""
         try:
-            r = requests.get(f"{SPRING_API}/tramites/report-data", headers=_headers(), timeout=15)
-            if r.status_code == 401:
-                _get_token()
-                r = requests.get(f"{SPRING_API}/tramites/report-data", headers=_headers(), timeout=15)
-            r.raise_for_status()
-            data = r.json()
+            data = api_get("/tramites/report-data")
             rows = data if isinstance(data, list) else []
             logger.info(f"DataService.get_all_enriched: {len(rows)} tramites.")
             return rows
@@ -133,15 +101,7 @@ class DataService:
             params["dateTo"] = filters["dateTo"]
 
         try:
-            r = requests.get(f"{SPRING_API}/tramites",
-                             params=params, headers=_headers(), timeout=10)
-            if r.status_code == 401:
-                _get_token()
-                r = requests.get(f"{SPRING_API}/tramites",
-                                 params=params, headers=_headers(), timeout=10)
-            r.raise_for_status()
-            data = r.json()
-            # Normalizar a lista
+            data = api_get("/tramites", params=params)
             rows = data if isinstance(data, list) else data.get("content", [])
             logger.info(f"DataService: {len(rows)} tramites.")
             return rows

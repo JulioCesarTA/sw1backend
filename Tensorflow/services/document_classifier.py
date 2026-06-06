@@ -9,40 +9,15 @@ Fallback a "OTRO" si no hay texto reconocible.
 import logging
 import os
 import re
-import requests
 import numpy as np
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 from tensorflow import keras
 
+from services.api_client import api_get
+
 logger = logging.getLogger(__name__)
-
-SPRING_API      = os.getenv("SPRING_API_URL", "http://localhost:8080/api")
-SPRING_EMAIL    = os.getenv("SPRING_EMAIL",   "juan@gmail.com")
-SPRING_PASSWORD = os.getenv("SPRING_PASSWORD","julioavila")
-
-_token: str = ""
-
-
-def _get_token() -> str:
-    global _token
-    try:
-        r = requests.post(f"{SPRING_API}/auth/login",
-                          json={"email": SPRING_EMAIL, "password": SPRING_PASSWORD},
-                          timeout=8)
-        r.raise_for_status()
-        d = r.json()
-        _token = d.get("accessToken") or d.get("token") or ""
-    except Exception as e:
-        logger.warning(f"DocumentClassifier auth: {e}")
-        _token = ""
-    return _token
-
-
-def _headers() -> dict:
-    tok = _token or _get_token()
-    return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 
 def _normalize(text: str) -> str:
@@ -59,23 +34,16 @@ def _load_file_fields_from_workflows() -> list[str]:
     """
     field_names: set[str] = set()
     try:
-        _get_token()
-        r = requests.get(f"{SPRING_API}/workflows", headers=_headers(), timeout=10)
-        if r.status_code == 401:
-            _get_token()
-            r = requests.get(f"{SPRING_API}/workflows", headers=_headers(), timeout=10)
-        r.raise_for_status()
-        wf_list = r.json() if isinstance(r.json(), list) else []
+        wf_list = api_get("/workflows")
+        if not isinstance(wf_list, list):
+            wf_list = []
 
         for wf in wf_list:
             wf_id = wf.get("id")
             if not wf_id:
                 continue
             try:
-                rw = requests.get(f"{SPRING_API}/workflows/{wf_id}",
-                                  headers=_headers(), timeout=10)
-                rw.raise_for_status()
-                full  = rw.json()
+                full = api_get(f"/workflows/{wf_id}")
                 nodos = sorted(full.get("nodo", []),
                                key=lambda n: n.get("order", 9999))
 
