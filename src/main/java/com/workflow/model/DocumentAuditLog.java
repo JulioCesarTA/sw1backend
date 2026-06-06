@@ -39,5 +39,7 @@ public class DocumentAuditLog {
     private String departmentId;
     private String departmentName;
     private String comment;
+    private String textBefore;
+    private String textAfter;
     private Instant createdAt = Instant.now();
 }

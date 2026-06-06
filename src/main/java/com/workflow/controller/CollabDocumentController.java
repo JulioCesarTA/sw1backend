@@ -1,19 +1,11 @@
 package com.workflow.controller;
-
 import com.workflow.model.CollabDocument;
 import com.workflow.model.User;
 import com.workflow.service.CollabDocumentService;
-import com.workflow.service.CollabExportService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -23,10 +15,6 @@ import java.util.Map;
 public class CollabDocumentController {
 
     private final CollabDocumentService service;
-    private final CollabExportService exportService;
-
-    private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody Map<String, String> body,
@@ -73,7 +61,10 @@ public class CollabDocumentController {
         return ResponseEntity.ok(service.saveState(
                 docId,
                 body.get("ydocState"),
-                body.get("textSnapshot")
+                body.get("textSnapshot"),
+                body.get("userId"),
+                body.get("userName"),
+                body.get("userEmail")
         ));
     }
 
@@ -100,26 +91,4 @@ public class CollabDocumentController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping("/export")
-    public ResponseEntity<byte[]> export(@RequestBody Map<String, String> body) throws IOException {
-        String format = body.getOrDefault("format", "word").trim().toLowerCase();
-        String title  = body.getOrDefault("title", "Documento").trim();
-        String html   = body.getOrDefault("html", "");
-        String ts     = LocalDateTime.now().format(TS);
-        String safeName = title.replaceAll("[^\\w\\s-]", "").trim().replace(' ', '_');
-
-        if ("excel".equals(format)) {
-            byte[] data = exportService.exportExcel(title, html);
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeName + "_" + ts + ".xlsx\"")
-                    .body(data);
-        }
-
-        byte[] data = exportService.exportWord(title, html);
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeName + "_" + ts + ".docx\"")
-                .body(data);
-    }
 }

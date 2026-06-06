@@ -37,6 +37,12 @@ public class JobRoleService {
         return jobRoleRepository.save(jobRole);
     }
 
+    public void delete(String id) {
+        if (!jobRoleRepository.existsById(id))
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Rol no encontrado");
+        jobRoleRepository.deleteById(id);
+    }
+
     public JobRole update(String id, Map<String, Object> body) {
         JobRole jobRole = jobRoleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rol no encontrado"));

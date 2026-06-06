@@ -58,6 +58,44 @@ public class TramiteService {
             new NodoUnionHandler()
     );
 
+    public List<Map<String, Object>> findAllForReport() {
+        List<Tramite> tramites = tramiteRepo.findAll();
+
+        Set<String> workflowIds = tramites.stream().map(Tramite::getWorkflowId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<String, Workflow> workflowMap = workflowRepo.findAllById(workflowIds).stream()
+                .collect(Collectors.toMap(Workflow::getId, w -> w));
+
+        Set<String> nodoIds = tramites.stream().map(Tramite::getCurrentNodoId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<String, WorkflowNodo> nodoMap = nodoRepo.findAllById(nodoIds).stream()
+                .collect(Collectors.toMap(WorkflowNodo::getId, n -> n));
+
+        Set<String> deptIds = nodoMap.values().stream()
+                .map(WorkflowNodo::getResponsibleDepartmentId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<String, String> deptNameMap = departmentRepo.findAllById(deptIds).stream()
+                .collect(Collectors.toMap(Department::getId, Department::getName));
+
+        Set<String> userIds = tramites.stream().map(Tramite::getRequestedById).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<String, String> userNameMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u.getName() != null ? u.getName() : u.getEmail()));
+
+        return tramites.stream().map(t -> {
+            Workflow wf = workflowMap.get(t.getWorkflowId());
+            WorkflowNodo nodo = t.getCurrentNodoId() != null ? nodoMap.get(t.getCurrentNodoId()) : null;
+            String deptName = nodo != null && nodo.getResponsibleDepartmentId() != null
+                    ? deptNameMap.get(nodo.getResponsibleDepartmentId()) : null;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("tramiteId", t.getId());
+            row.put("code", t.getCode());
+            row.put("title", t.getTitle());
+            row.put("workflowName", wf != null ? wf.getName() : t.getWorkflowId());
+            row.put("departmentName", deptName != null ? deptName : "");
+            row.put("status", t.getStatus() != null ? t.getStatus().name() : "");
+            row.put("userName", userNameMap.getOrDefault(t.getRequestedById(), ""));
+            row.put("createdAt", t.getCreatedAt() != null ? t.getCreatedAt().toString() : "");
+            return row;
+        }).toList();
+    }
+
     public List<Tramite> findAll(User user) {
         if (user.getRole() == User.Role.ADMIN || user.getRole() == User.Role.SUPERADMIN) {
             return tramiteRepo.findAll();

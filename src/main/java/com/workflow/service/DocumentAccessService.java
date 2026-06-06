@@ -3,14 +3,11 @@ package com.workflow.service;
 import com.workflow.model.Department;
 import com.workflow.model.DocumentAuditLog;
 import com.workflow.model.FormDefinition;
-import com.workflow.model.Tramite;
 import com.workflow.model.User;
 import com.workflow.model.Workflow;
 import com.workflow.model.WorkflowNodo;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.DocumentAuditLogRepository;
-import com.workflow.repository.TramiteRepository;
-import com.workflow.repository.WorkflowNodoRepository;
 import com.workflow.repository.WorkflowRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -37,11 +34,8 @@ public class DocumentAccessService {
     }
 
     public record StoredFileReference(String fieldName, String storedName, String fileName) {}
-    public record FileAccessContext(String tramiteId, String workflowId, String nodoId, StoredFileReference file) {}
 
-    private final TramiteRepository tramiteRepository;
     private final WorkflowRepository workflowRepository;
-    private final WorkflowNodoRepository workflowNodoRepository;
     private final DepartmentRepository departmentRepository;
     private final DocumentAuditLogRepository documentAuditLogRepository;
 
@@ -63,9 +57,11 @@ public class DocumentAccessService {
         if (nodo.getDocumentPermissions() == null || nodo.getDocumentPermissions().isEmpty()) {
             return matchesResponsibleAssignment(nodo, actor);
         }
-        if (actor.getDepartmentId() == null || actor.getDepartmentId().isBlank()) return false;
+        // Los permisos documentales usan departmentId para almacenar el jobRoleId del cargo asignado
+        String actorJobRoleId = actor.getJobRoleId();
+        if (actorJobRoleId == null || actorJobRoleId.isBlank()) return false;
         return nodo.getDocumentPermissions().stream()
-                .filter(permission -> actor.getDepartmentId().equals(permission.getDepartmentId()))
+                .filter(permission -> actorJobRoleId.equals(permission.getDepartmentId()))
                 .anyMatch(permission -> switch (type) {
                     case CREATE -> permission.isCanCreate();
                     case READ -> permission.isCanRead();
@@ -78,33 +74,6 @@ public class DocumentAccessService {
         return hasPermission(nodo, actor, PermissionType.READ)
                 || hasPermission(nodo, actor, PermissionType.CREATE)
                 || hasPermission(nodo, actor, PermissionType.EDIT);
-    }
-
-    public FileAccessContext requireFileAccess(String tramiteId,
-                                               String fieldName,
-                                               String storedName,
-                                               User actor,
-                                               PermissionType permissionType) {
-        Tramite tramite = tramiteRepository.findById(tramiteId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tramite no encontrado"));
-        Workflow workflow = workflowRepository.findById(tramite.getWorkflowId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow no encontrado"));
-        WorkflowNodo nodo = workflowNodoRepository.findById(tramite.getCurrentNodoId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Nodo actual no encontrado"));
-
-        if (!isAdmin(actor) && (actor == null || actor.getCompanyId() == null || !Objects.equals(actor.getCompanyId(), workflow.getCompanyId()))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a este trámite");
-        }
-        if (!hasPermission(nodo, actor, permissionType) && !isAdmin(actor)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos sobre este documento");
-        }
-
-        StoredFileReference fileReference = extractStoredFiles(tramite.getFormData()).stream()
-                .filter(file -> Objects.equals(file.fieldName(), fieldName) && Objects.equals(file.storedName(), storedName))
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo no encontrado en el trámite"));
-
-        return new FileAccessContext(tramite.getId(), workflow.getId(), nodo.getId(), fileReference);
     }
 
     public void recordRead(String tramiteId, String workflowId, String nodoId, StoredFileReference file, User actor) {
@@ -131,6 +100,30 @@ public class DocumentAccessService {
     public void recordCollabEdited(String tramiteId, String workflowId, String storedName, String fileName, User actor) {
         StoredFileReference ref = new StoredFileReference("collab", storedName, fileName);
         record(tramiteId, workflowId, null, ref, actor, DocumentAuditLog.Action.COLLAB_EDITED, "Edición guardada en editor colaborativo");
+    }
+
+    public void recordCollabEdited(String tramiteId, String workflowId, String storedName, String fileName,
+                                   String textBefore, String textAfter,
+                                   String userId, String userName, String userEmail) {
+        DocumentAuditLog log = new DocumentAuditLog();
+        log.setTramiteId(tramiteId);
+        log.setWorkflowId(workflowId);
+        log.setFieldName("collab");
+        log.setStoredName(storedName != null ? storedName : "");
+        log.setFileName(fileName != null ? fileName : storedName);
+        log.setAction(DocumentAuditLog.Action.COLLAB_EDITED);
+        log.setComment("Edición guardada en editor colaborativo");
+        log.setUserId(userId);
+        log.setUserName(userName);
+        log.setUserEmail(userEmail);
+        log.setTextBefore(truncate(textBefore, 2000));
+        log.setTextAfter(truncate(textAfter, 2000));
+        documentAuditLogRepository.save(log);
+    }
+
+    private String truncate(String text, int max) {
+        if (text == null) return null;
+        return text.length() <= max ? text : text.substring(0, max) + "…";
     }
 
     public List<Map<String, Object>> listAuditLogs(User actor) {
@@ -161,6 +154,8 @@ public class DocumentAccessService {
             item.put("departmentId", log.getDepartmentId());
             item.put("departmentName", log.getDepartmentName());
             item.put("comment", log.getComment());
+            item.put("textBefore", log.getTextBefore());
+            item.put("textAfter", log.getTextAfter());
             item.put("createdAt", log.getCreatedAt());
             return item;
         }).toList();

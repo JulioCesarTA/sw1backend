@@ -80,11 +80,14 @@ public class CollabDocumentWsController {
     @MessageMapping("/collab-docs/{docId}/save-state")
     public void saveState(@DestinationVariable String docId,
                           @Payload Map<String, Object> body) {
-        String ydocState = str(body.get("ydocState"));
+        String ydocState    = str(body.get("ydocState"));
         String textSnapshot = str(body.get("textSnapshot"));
+        String userId       = str(body.get("userId"));
+        String userName     = str(body.get("userName"));
+        String userEmail    = str(body.get("userEmail"));
         if (ydocState == null || ydocState.isBlank()) return;
         try {
-            service.saveState(docId, ydocState, textSnapshot);
+            service.saveState(docId, ydocState, textSnapshot, userId, userName, userEmail);
         } catch (Exception ignored) {}
     }
 

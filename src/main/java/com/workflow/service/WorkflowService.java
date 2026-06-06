@@ -89,6 +89,18 @@ public class WorkflowService {
         return workflowRepo.save(workflow);
     }
 
+    public void delete(String id, User actor) {
+        Workflow workflow = findWorkflow(id);
+        validateWorkflowScope(actor, workflow);
+        List<WorkflowNodo> nodos = nodoRepo.findByWorkflowIdOrderByOrderAsc(id);
+        Set<String> nodoIds = nodos.stream().map(WorkflowNodo::getId).collect(Collectors.toSet());
+        if (!nodoIds.isEmpty()) formRepo.deleteAll(formRepo.findByNodoIdIn(nodoIds));
+        List<WorkflowTransition> transitions = transitionRepo.findByWorkflowIdOrderByCreatedAtAsc(id);
+        transitionRepo.deleteAll(transitions);
+        nodoRepo.deleteAll(nodos);
+        workflowRepo.deleteById(id);
+    }
+
     public Workflow update(String id, Map<String, Object> body, User actor) {
         Workflow workflow = findWorkflow(id);
         validateWorkflowScope(actor, workflow);

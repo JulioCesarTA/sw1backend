@@ -31,4 +31,10 @@ public class JobRoleController {
     public ResponseEntity<JobRole> update(@PathVariable("id") String id, @RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(jobRoleService.update(id, body));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable("id") String id) {
+        jobRoleService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

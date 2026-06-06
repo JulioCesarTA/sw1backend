@@ -76,10 +76,6 @@ public class FileStorageService {
         this.localUploadDir = dir;
     }
 
-    public boolean isS3Available() {
-        return s3Available;
-    }
-
     /**
      * Sube un archivo. Si se provee workflowId, el archivo queda en
      * {keyPrefix}/{workflowId}/{uuid}.ext — una carpeta por workflow.
@@ -111,20 +107,17 @@ public class FileStorageService {
         meta.put("workflowId", folder != null ? workflowId : null);
         meta.put("contentType", file.getContentType());
         meta.put("size", file.getSize());
-        meta.put("downloadPath", "/files/" + storedName + "/download");
+        String downloadPath = null;
+        if (s3Available) {
+            try {
+                downloadPath = createPresignedDownloadUrl(storedName, folder, originalName);
+            } catch (Exception ignored) {}
+        }
+        meta.put("downloadPath", downloadPath);
         return meta;
     }
 
-    /** Retro-compatible: sin workflowId (archivos viejos o subida sin contexto). */
-    public Map<String, Object> store(MultipartFile file) {
-        return store(file, null);
-    }
-
-    /**
-     * Genera URL pre-firmada. Busca primero en la carpeta del workflow;
-     * si no existe (archivo viejo), cae al nivel raíz.
-     */
-    public String createPresignedDownloadUrl(String storedName, String workflowId, String filename) {
+    private String createPresignedDownloadUrl(String storedName, String workflowId, String filename) {
         if (!s3Available) return null;
         String folder = sanitizeFolder(workflowId);
         String objectKey = folder != null
@@ -143,12 +136,7 @@ public class FileStorageService {
         return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 
-    /** Retro-compatible: sin workflowId. */
-    public String createPresignedDownloadUrl(String storedName, String filename) {
-        return createPresignedDownloadUrl(storedName, null, filename);
-    }
-
-    public byte[] readLocalFile(String storedName, String workflowId) {
+    private byte[] readLocalFile(String storedName, String workflowId) {
         String folder = sanitizeFolder(workflowId);
         Path file = folder != null
                 ? localUploadDir.resolve(folder).resolve(storedName)
@@ -168,27 +156,6 @@ public class FileStorageService {
         }
     }
 
-    public byte[] readLocalFile(String storedName) {
-        return readLocalFile(storedName, null);
-    }
-
-    public String detectContentType(String storedName) {
-        try {
-            Path file = localUploadDir.resolve(storedName);
-            String ct = Files.probeContentType(file);
-            return ct != null ? ct : "application/octet-stream";
-        } catch (IOException e) {
-            return "application/octet-stream";
-        }
-    }
-
-    /**
-     * Lee los bytes de un archivo desde S3 o local (para conversión inline).
-     */
-    /**
-     * Descarga los bytes de un archivo via URL pre-firmada (funciona sin s3:GetObject directo).
-     * Fallback a almacenamiento local si S3 no está disponible.
-     */
     public byte[] readFileBytes(String storedName, String workflowId) {
         if (s3Available) {
             // Intentar con carpeta de workflow primero, luego raíz como fallback

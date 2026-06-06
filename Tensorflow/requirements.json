@@ -1,0 +1,60 @@
+{
+  "69f17c2e30cac369f8d4e62b": {
+    "requiredDocs": [
+      "DNI",
+      "FACTURA",
+      "COMPROBANTE"
+    ],
+    "optionalDocs": [
+      "FOTO_MEDIDOR",
+      "CONTRATO"
+    ],
+    "keywords": [
+      "tuberia",
+      "agua",
+      "cañeria",
+      "fuga",
+      "perdida",
+      "plomeria",
+      "cano"
+    ]
+  },
+  "69f1df736b35f567cf1e1927": {
+    "requiredDocs": [
+      "DNI",
+      "SOLICITUD"
+    ],
+    "optionalDocs": [
+      "FACTURA",
+      "CERTIFICADO"
+    ],
+    "keywords": [
+      "computadora",
+      "laptop",
+      "pc",
+      "red",
+      "internet",
+      "sistema",
+      "software"
+    ]
+  },
+  "69f241afda345c089ef8dfde": {
+    "requiredDocs": [
+      "DNI",
+      "FOTO_MEDIDOR"
+    ],
+    "optionalDocs": [
+      "FACTURA",
+      "COMPROBANTE"
+    ],
+    "keywords": [
+      "medidor",
+      "contador",
+      "luz",
+      "electricidad",
+      "electrico",
+      "equipo",
+      "arreglar medidor"
+    ]
+  }
+}

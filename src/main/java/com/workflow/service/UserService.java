@@ -65,4 +65,15 @@ public class UserService {
         if (body.containsKey("password")) user.setPassword(passwordEncoder.encode((String) body.get("password")));
         return userRepo.save(user);
     }
+
+    public void delete(String id, User actor) {
+        User user = userRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        if (actor.getRole() != User.Role.SUPERADMIN) {
+            if (actor.getCompanyId() == null || !actor.getCompanyId().equals(user.getCompanyId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a este usuario");
+            }
+        }
+        userRepo.deleteById(id);
+    }
 }

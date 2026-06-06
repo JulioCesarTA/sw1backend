@@ -83,8 +83,10 @@ public class CollabDocumentService {
         repository.deleteById(docId);
     }
 
-    public Map<String, Object> saveState(String docId, String ydocState, String textSnapshot) {
+    public Map<String, Object> saveState(String docId, String ydocState, String textSnapshot,
+                                         String userId, String userName, String userEmail) {
         CollabDocument doc = getById(docId);
+        String textBefore = doc.getTextSnapshot();
         if (ydocState != null && !ydocState.isBlank()) {
             doc.setYdocState(ydocState);
         }
@@ -93,6 +95,13 @@ public class CollabDocumentService {
         }
         doc.setUpdatedAt(Instant.now());
         repository.save(doc);
+        if (userId != null && !userId.isBlank() && textSnapshot != null
+                && !textSnapshot.equals(textBefore)) {
+            String storedRef = doc.getFileStoredName() != null ? doc.getFileStoredName() : doc.getId();
+            documentAccessService.recordCollabEdited(
+                    doc.getTramiteId(), doc.getWorkflowId(), storedRef, doc.getTitle(),
+                    textBefore, textSnapshot, userId, userName, userEmail);
+        }
         return Map.of("ok", true);
     }
 

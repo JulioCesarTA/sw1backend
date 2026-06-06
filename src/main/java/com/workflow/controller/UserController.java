@@ -32,4 +32,10 @@ public class UserController {
     public ResponseEntity<User> update(@PathVariable String id, @RequestBody Map<String, Object> body, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(userService.update(id, body, user));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable String id, @AuthenticationPrincipal User user) {
+        userService.delete(id, user);
+        return ResponseEntity.noContent().build();
+    }
 }

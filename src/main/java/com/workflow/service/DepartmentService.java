@@ -36,6 +36,12 @@ public class DepartmentService {
         return departmentRepo.save(department);
     }
 
+    public void delete(String id) {
+        if (!departmentRepo.existsById(id))
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Departamento no encontrado");
+        departmentRepo.deleteById(id);
+    }
+
     public Department update(String id, Map<String, Object> body) {
         Department department = departmentRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Departamento no encontrado"));

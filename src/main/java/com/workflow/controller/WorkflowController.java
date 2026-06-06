@@ -39,4 +39,10 @@ public class WorkflowController {
                                          @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(workflowService.update(id, body, user));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable("id") String id, @AuthenticationPrincipal User user) {
+        workflowService.delete(id, user);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 
 @RestController
 @RequestMapping("/tramites")
@@ -22,6 +23,11 @@ public class TramiteController {
     @GetMapping
     public ResponseEntity<List<Tramite>> findAll(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(tramiteService.findAll(user));
+    }
+
+    @GetMapping("/report-data")
+    public ResponseEntity<List<Map<String, Object>>> reportData() {
+        return ResponseEntity.ok(tramiteService.findAllForReport());
     }
 
     @GetMapping("/{id}")
