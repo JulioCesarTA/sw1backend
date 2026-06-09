@@ -10,7 +10,8 @@ Endpoints activos:
   GET  /nlp/optimize-workflow/{id} → WorkflowOptimizer: recomendaciones de nodos
   GET  /nlp/predict-delay/{id}     → DelayPredictor: probabilidad de demora
   GET  /nlp/predict-bottleneck/{id}→ BottleneckPredictor: nodos con mayor riesgo
-  GET  /nlp/rank-priority-real     → PriorityRanker: trámites activos por urgencia
+  GET  /nlp/rank-priority-real     → PriorityRanker: trámites activos por urgencia (TF por workflow)
+  GET  /nlp/detect-anomalies       → AnomalyDetector: trámites con comportamiento anómalo (Autoencoder TF)
 """
 
 import logging
@@ -26,15 +27,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from services.data_service        import DataService
-from services.report_service      import generate_word, generate_excel
-from services.prompt_parser       import PromptParser
-from services.workflow_matcher    import WorkflowMatcher
-from services.document_reader     import extract_text
-from services.document_classifier import DocumentClassifier
-from services.form_filler         import FormFiller
-from services.workflow_optimizer  import WorkflowOptimizer
-from services.predictor_service   import DelayPredictor, BottleneckPredictor, PriorityRanker
+from reports.data_service              import DataService
+from reports.report_service            import generate_word, generate_excel
+from nlp.prompt_parser                 import PromptParser
+from nlp.document_reader               import extract_text
+from nlp.form_filler                   import FormFiller
+from ai.workflow_matcher               import WorkflowMatcher
+from ai.document_classifier            import DocumentClassifier
+from ai.workflow_optimizer             import WorkflowOptimizer
+from ai.predictor.delay_predictor      import DelayPredictor
+from ai.predictor.bottleneck_predictor import BottleneckPredictor
+from ai.predictor.priority_ranker      import PriorityRanker
+from ai.predictor.anomaly_detector     import AnomalyDetector
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s")
@@ -47,15 +51,16 @@ data_svc:        DataService        | None = None
 wf_matcher:      WorkflowMatcher    | None = None
 doc_clf:         DocumentClassifier | None = None
 form_filler:     FormFiller         | None = None
-delay_predictor: DelayPredictor     | None = None
-bottleneck_pred: BottleneckPredictor| None = None
-priority_ranker: PriorityRanker     | None = None
+delay_predictor:   DelayPredictor     | None = None
+bottleneck_pred:   BottleneckPredictor| None = None
+priority_ranker:   PriorityRanker     | None = None
+anomaly_detector:  AnomalyDetector    | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global data_svc, wf_matcher, doc_clf, form_filler
-    global delay_predictor, bottleneck_pred, priority_ranker
+    global delay_predictor, bottleneck_pred, priority_ranker, anomaly_detector
 
     logger.info("▶ Iniciando modelos TensorFlow …")
     doc_clf     = DocumentClassifier()
@@ -90,6 +95,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"PriorityRanker no disponible: {e}")
         priority_ranker = None
+
+    try:
+        anomaly_detector = AnomalyDetector()
+        logger.info("✓ AnomalyDetector listo.")
+    except Exception as e:
+        logger.warning(f"AnomalyDetector no disponible: {e}")
+        anomaly_detector = None
 
     logger.info("✓ Servicio listo en http://localhost:8001")
     yield
@@ -301,7 +313,7 @@ async def predict_bottleneck(workflow_id: str):
 
 
 # -----------------------------------------------------------------------
-# ⑨ GET /nlp/rank-priority-real  — PriorityRanker
+# ⑨ GET /nlp/rank-priority-real  — PriorityRanker (todos los workflows)
 # -----------------------------------------------------------------------
 @app.get("/nlp/rank-priority-real")
 async def rank_priority_real():
@@ -312,17 +324,65 @@ async def rank_priority_real():
 
 
 # -----------------------------------------------------------------------
+# POST /nlp/rank-priority-real/{workflow_id}  — entrenar + rankear un workflow
+# -----------------------------------------------------------------------
+@app.post("/nlp/rank-priority-real/{workflow_id}")
+async def rank_priority_workflow(workflow_id: str):
+    if not priority_ranker:
+        raise HTTPException(503, "PriorityRanker no inicializado")
+    try:
+        return priority_ranker.rank_workflow(workflow_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+# -----------------------------------------------------------------------
+# ⑩ GET /nlp/detect-anomalies  — AnomalyDetector (todos los workflows)
+# -----------------------------------------------------------------------
+@app.get("/nlp/detect-anomalies")
+async def detect_anomalies():
+    if not anomaly_detector:
+        raise HTTPException(503, "AnomalyDetector no inicializado")
+    return anomaly_detector.detect()
+
+
+# -----------------------------------------------------------------------
+# ⑪ POST /nlp/detect-anomalies/{workflow_id}  — entrenar + detectar para un workflow
+# -----------------------------------------------------------------------
+@app.post("/nlp/detect-anomalies/{workflow_id}")
+async def detect_anomalies_workflow(workflow_id: str):
+    if not anomaly_detector:
+        raise HTTPException(503, "AnomalyDetector no inicializado")
+    try:
+        return anomaly_detector.train_and_detect_workflow(workflow_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+# -----------------------------------------------------------------------
+# ⑫ POST /nlp/reload-workflows  — recarga workflows sin reiniciar el servicio
+# -----------------------------------------------------------------------
+@app.post("/nlp/reload-workflows")
+async def reload_workflows():
+    if not wf_matcher:
+        raise HTTPException(503, "WorkflowMatcher no inicializado")
+    wf_matcher.reload()
+    return {"ok": True, "workflows": len(wf_matcher.workflows)}
+
+
+# -----------------------------------------------------------------------
 # Health
 # -----------------------------------------------------------------------
 @app.get("/health")
 async def health():
     return {
-        "status":           "ok",
-        "doc_clf_loaded":   doc_clf is not None,
-        "workflows_loaded": len(wf_matcher.workflows) if wf_matcher else 0,
-        "delay_predictor":  delay_predictor is not None,
-        "bottleneck_pred":  bottleneck_pred is not None,
-        "priority_ranker":  priority_ranker is not None,
+        "status":            "ok",
+        "doc_clf_loaded":    doc_clf is not None,
+        "workflows_loaded":  len(wf_matcher.workflows) if wf_matcher else 0,
+        "delay_predictor":   delay_predictor is not None,
+        "bottleneck_pred":   bottleneck_pred is not None,
+        "priority_ranker":   priority_ranker is not None,
+        "anomaly_detector":  anomaly_detector is not None,
     }
 
 

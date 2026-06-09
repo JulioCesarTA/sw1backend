@@ -36,6 +36,7 @@ app:
     api-key: ${CLAUDE_API_KEY:}
   ai:
     base-url: ${AI_BASE_URL:http://ia:5000}
+    tf-base-url: ${TF_BASE_URL:http://tf:8001}
   firebase:
     service-account: ${FIREBASE_SERVICE_ACCOUNT:}
 

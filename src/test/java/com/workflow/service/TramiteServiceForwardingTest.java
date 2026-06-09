@@ -42,7 +42,8 @@ class TramiteServiceForwardingTest {
                 mock(DocumentAccessService.class),
                 mock(WorkflowAiProxyService.class),
                 mock(FcmService.class),
-                mock(ReportRealtimeService.class)
+                mock(ReportRealtimeService.class),
+                mock(FileStorageService.class)
         );
 
         textField = new FormDefinition.FormField();

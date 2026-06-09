@@ -12,6 +12,8 @@ import java.time.Instant;
 @NoArgsConstructor
 @Document(collection = "document_audit_logs")
 @CompoundIndex(name = "tramite_document_date", def = "{'tramiteId': 1, 'storedName': 1, 'createdAt': -1}")
+@CompoundIndex(name = "workflow_date",         def = "{'workflowId': 1, 'createdAt': -1}")
+@CompoundIndex(name = "date_only",             def = "{'createdAt': -1}")
 public class DocumentAuditLog {
 
     public enum Action {
@@ -38,7 +40,6 @@ public class DocumentAuditLog {
     private String userEmail;
     private String departmentId;
     private String departmentName;
-    private String comment;
     private String textBefore;
     private String textAfter;
     private Instant createdAt = Instant.now();

@@ -8,6 +8,7 @@ import com.workflow.model.Workflow;
 import com.workflow.model.WorkflowNodo;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.DocumentAuditLogRepository;
+import com.workflow.repository.UserRepository;
 import com.workflow.repository.WorkflowRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,7 @@ public class DocumentAccessService {
     private final WorkflowRepository workflowRepository;
     private final DepartmentRepository departmentRepository;
     private final DocumentAuditLogRepository documentAuditLogRepository;
+    private final UserRepository userRepository;
 
     public Map<String, Boolean> resolvePermissions(WorkflowNodo nodo, User actor) {
         boolean admin = isAdmin(actor);
@@ -77,29 +79,29 @@ public class DocumentAccessService {
     }
 
     public void recordRead(String tramiteId, String workflowId, String nodoId, StoredFileReference file, User actor) {
-        record(tramiteId, workflowId, nodoId, file, actor, DocumentAuditLog.Action.READ, "Documento consultado");
+        record(tramiteId, workflowId, nodoId, file, actor, DocumentAuditLog.Action.READ);
     }
 
     public void recordCreated(String tramiteId, String workflowId, String nodoId, StoredFileReference file, User actor) {
-        record(tramiteId, workflowId, nodoId, file, actor, DocumentAuditLog.Action.CREATED, "Documento agregado");
+        record(tramiteId, workflowId, nodoId, file, actor, DocumentAuditLog.Action.CREATED);
     }
 
     public void recordUpdated(String tramiteId, String workflowId, String nodoId, StoredFileReference file, User actor) {
-        record(tramiteId, workflowId, nodoId, file, actor, DocumentAuditLog.Action.UPDATED, "Documento reemplazado o editado");
+        record(tramiteId, workflowId, nodoId, file, actor, DocumentAuditLog.Action.UPDATED);
     }
 
     public void recordDeleted(String tramiteId, String workflowId, String nodoId, StoredFileReference file, User actor) {
-        record(tramiteId, workflowId, nodoId, file, actor, DocumentAuditLog.Action.DELETED, "Documento eliminado");
+        record(tramiteId, workflowId, nodoId, file, actor, DocumentAuditLog.Action.DELETED);
     }
 
     public void recordCollabOpened(String tramiteId, String workflowId, String storedName, String fileName, User actor) {
         StoredFileReference ref = new StoredFileReference("collab", storedName, fileName);
-        record(tramiteId, workflowId, null, ref, actor, DocumentAuditLog.Action.COLLAB_OPENED, "Archivo abierto en editor colaborativo");
+        record(tramiteId, workflowId, null, ref, actor, DocumentAuditLog.Action.COLLAB_OPENED);
     }
 
     public void recordCollabEdited(String tramiteId, String workflowId, String storedName, String fileName, User actor) {
         StoredFileReference ref = new StoredFileReference("collab", storedName, fileName);
-        record(tramiteId, workflowId, null, ref, actor, DocumentAuditLog.Action.COLLAB_EDITED, "Edición guardada en editor colaborativo");
+        record(tramiteId, workflowId, null, ref, actor, DocumentAuditLog.Action.COLLAB_EDITED);
     }
 
     public void recordCollabEdited(String tramiteId, String workflowId, String storedName, String fileName,
@@ -112,10 +114,19 @@ public class DocumentAccessService {
         log.setStoredName(storedName != null ? storedName : "");
         log.setFileName(fileName != null ? fileName : storedName);
         log.setAction(DocumentAuditLog.Action.COLLAB_EDITED);
-        log.setComment("Edición guardada en editor colaborativo");
         log.setUserId(userId);
         log.setUserName(userName);
         log.setUserEmail(userEmail);
+        // Resolver departamento desde el userId
+        if (userId != null) {
+            userRepository.findById(userId).ifPresent(user -> {
+                if (user.getDepartmentId() != null) {
+                    log.setDepartmentId(user.getDepartmentId());
+                    departmentRepository.findById(user.getDepartmentId())
+                            .ifPresent(dept -> log.setDepartmentName(dept.getName()));
+                }
+            });
+        }
         log.setTextBefore(truncate(textBefore, 2000));
         log.setTextAfter(truncate(textAfter, 2000));
         documentAuditLogRepository.save(log);
@@ -130,35 +141,69 @@ public class DocumentAccessService {
         if (!isAdmin(actor)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo administradores pueden ver la auditoría documental");
         }
-        List<DocumentAuditLog> logs = documentAuditLogRepository.findAll().stream()
-                .filter(log -> actor.getRole() == User.Role.SUPERADMIN || belongsToActorCompany(log.getWorkflowId(), actor))
-                .sorted(Comparator.comparing(DocumentAuditLog::getCreatedAt).reversed())
-                .toList();
-        Set<String> workflowIds = logs.stream().map(DocumentAuditLog::getWorkflowId).filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<String, String> workflowNames = workflowRepository.findAllById(workflowIds).stream()
-                .collect(Collectors.toMap(Workflow::getId, Workflow::getName));
+
+        // 1. Obtener logs + mapa de nombres de workflow (mínimas queries a Atlas)
+        List<DocumentAuditLog> logs;
+        Map<String, String> workflowNames;
+        if (actor.getRole() == User.Role.SUPERADMIN) {
+            // SUPERADMIN: 2 queries total
+            logs = documentAuditLogRepository.findTop500ByOrderByCreatedAtDesc();
+            Set<String> wfIds = logs.stream()
+                    .map(DocumentAuditLog::getWorkflowId).filter(Objects::nonNull).collect(Collectors.toSet());
+            workflowNames = workflowRepository.findAllById(wfIds).stream()
+                    .collect(Collectors.toMap(Workflow::getId, Workflow::getName));
+        } else {
+            // ADMIN: 2 queries total — la primera ya trae los nombres, no necesitamos una 3ª
+            List<Workflow> companyWorkflows = workflowRepository
+                    .findByCompanyIdOrderByCreatedAtDesc(actor.getCompanyId());
+            if (companyWorkflows.isEmpty()) return List.of();
+            workflowNames = companyWorkflows.stream()
+                    .collect(Collectors.toMap(Workflow::getId, Workflow::getName));
+            logs = documentAuditLogRepository
+                    .findByWorkflowIdInOrderByCreatedAtDesc(workflowNames.keySet());
+        }
+
+        // 3. Mapear — textBefore/textAfter NO se incluyen en el listado (son pesados)
+        //    Se obtienen solo al ver el detalle de una entrada (GET /document-audit/{id})
         return logs.stream().map(log -> {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", log.getId());
-            item.put("tramiteId", log.getTramiteId());
-            item.put("workflowId", log.getWorkflowId());
-            item.put("workflowName", workflowNames.get(log.getWorkflowId()));
-            item.put("nodoId", log.getNodoId());
-            item.put("fieldName", log.getFieldName());
-            item.put("storedName", log.getStoredName());
-            item.put("fileName", log.getFileName());
-            item.put("action", log.getAction());
-            item.put("userId", log.getUserId());
-            item.put("userName", log.getUserName());
-            item.put("userEmail", log.getUserEmail());
-            item.put("departmentId", log.getDepartmentId());
+            item.put("id",             log.getId());
+            item.put("tramiteId",      log.getTramiteId());
+            item.put("workflowId",     log.getWorkflowId());
+            item.put("workflowName",   workflowNames.get(log.getWorkflowId()));
+            item.put("fieldName",      log.getFieldName());
+            item.put("storedName",     log.getStoredName());
+            item.put("fileName",       log.getFileName());
+            item.put("action",         log.getAction());
+            item.put("userId",         log.getUserId());
+            item.put("userName",       log.getUserName());
             item.put("departmentName", log.getDepartmentName());
-            item.put("comment", log.getComment());
-            item.put("textBefore", log.getTextBefore());
-            item.put("textAfter", log.getTextAfter());
-            item.put("createdAt", log.getCreatedAt());
+            item.put("createdAt",      log.getCreatedAt());
             return item;
         }).toList();
+    }
+
+    public Map<String, Object> getAuditLogDetail(String logId, User actor) {
+        if (!isAdmin(actor)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo administradores pueden ver la auditoría documental");
+        }
+        DocumentAuditLog log = documentAuditLogRepository.findById(logId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Entrada no encontrada"));
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id",             log.getId());
+        item.put("tramiteId",      log.getTramiteId());
+        item.put("workflowId",     log.getWorkflowId());
+        item.put("fieldName",      log.getFieldName());
+        item.put("storedName",     log.getStoredName());
+        item.put("fileName",       log.getFileName());
+        item.put("action",         log.getAction());
+        item.put("userId",         log.getUserId());
+        item.put("userName",       log.getUserName());
+        item.put("departmentName", log.getDepartmentName());
+        item.put("textBefore",     log.getTextBefore());
+        item.put("textAfter",      log.getTextAfter());
+        item.put("createdAt",      log.getCreatedAt());
+        return item;
     }
 
     public List<StoredFileReference> extractStoredFiles(Map<String, Object> formData) {
@@ -194,8 +239,7 @@ public class DocumentAccessService {
                         String nodoId,
                         StoredFileReference file,
                         User actor,
-                        DocumentAuditLog.Action action,
-                        String comment) {
+                        DocumentAuditLog.Action action) {
         DocumentAuditLog log = new DocumentAuditLog();
         log.setTramiteId(tramiteId);
         log.setWorkflowId(workflowId);
@@ -204,7 +248,6 @@ public class DocumentAccessService {
         log.setStoredName(file.storedName());
         log.setFileName(file.fileName());
         log.setAction(action);
-        log.setComment(comment);
         if (actor != null) {
             log.setUserId(actor.getId());
             log.setUserName(actor.getName());

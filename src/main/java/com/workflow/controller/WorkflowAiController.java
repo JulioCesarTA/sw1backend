@@ -45,8 +45,8 @@ public class WorkflowAiController {
     }
 
     @PostMapping("/nlp/report-generate")
-    public ResponseEntity<Map<String, Object>> reportGenerate(@RequestBody Map<String, Object> body) {
-        return ResponseEntity.ok(workflowAiProxyService.reportGenerate(body));
+    public ResponseEntity<byte[]> reportGenerate(@RequestBody Map<String, Object> body) {
+        return workflowAiProxyService.reportGenerateRaw(body);
     }
 
     @PostMapping("/nlp/download")
@@ -71,5 +71,15 @@ public class WorkflowAiController {
                                                               @RequestParam(name = "files", required = false) List<MultipartFile> files,
                                                               @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(workflowAiProxyService.workflowRouter(prompt, user != null ? user.getCompanyId() : null, files));
+    }
+
+    @PostMapping("/nlp/rank-priority-real/{workflowId}")
+    public ResponseEntity<Map<String, Object>> rankPriorityWorkflow(@PathVariable String workflowId) {
+        return ResponseEntity.ok(workflowAiProxyService.rankPriorityWorkflow(workflowId));
+    }
+
+    @PostMapping("/nlp/detect-anomalies/{workflowId}")
+    public ResponseEntity<Map<String, Object>> detectAnomaliesWorkflow(@PathVariable String workflowId) {
+        return ResponseEntity.ok(workflowAiProxyService.detectAnomaliesWorkflow(workflowId));
     }
 }

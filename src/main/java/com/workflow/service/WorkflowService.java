@@ -37,6 +37,8 @@ public class WorkflowService {
     private final FormDefinitionRepository formRepo;
     private final CompanyRepository companyRepo;
     private final DepartmentRepository departmentRepo;
+    private final FileStorageService fileStorageService;
+    private final WorkflowAiProxyService workflowAiProxyService;
 
     public List<Map<String, Object>> findAll(User actor) {
         List<Workflow> workflows;
@@ -86,7 +88,10 @@ public class WorkflowService {
         workflow.setName((String) body.get("name"));
         workflow.setDescription((String) body.get("description"));
         workflow.setCompanyId((String) body.get("companyId"));
-        return workflowRepo.save(workflow);
+        Workflow saved = workflowRepo.save(workflow);
+        fileStorageService.createWorkflowFolder(saved.getName());
+        workflowAiProxyService.reloadWorkflowsAsync();
+        return saved;
     }
 
     public void delete(String id, User actor) {
@@ -99,6 +104,7 @@ public class WorkflowService {
         transitionRepo.deleteAll(transitions);
         nodoRepo.deleteAll(nodos);
         workflowRepo.deleteById(id);
+        workflowAiProxyService.reloadWorkflowsAsync();
     }
 
     public Workflow update(String id, Map<String, Object> body, User actor) {
@@ -110,7 +116,9 @@ public class WorkflowService {
         if (body.containsKey("name")) workflow.setName((String) body.get("name"));
         if (body.containsKey("description")) workflow.setDescription((String) body.get("description"));
         if (body.containsKey("companyId")) workflow.setCompanyId((String) body.get("companyId"));
-        return workflowRepo.save(workflow);
+        Workflow saved = workflowRepo.save(workflow);
+        workflowAiProxyService.reloadWorkflowsAsync();
+        return saved;
     }
 
     public WorkflowNodo createNodo(Map<String, Object> body) {
@@ -129,6 +137,7 @@ public class WorkflowService {
             try {
                 WorkflowNodo saved = nodoRepo.save(nodo);
                 syncNodoFormDefinition(saved, body);
+                workflowAiProxyService.reloadWorkflowsAsync();
                 return hydrateNodoFormDefinition(saved);
             } catch (DuplicateKeyException ex) {
                 nodo.setOrder(resolveCreateOrder(workflowId, nodo.getOrder() + 1));
@@ -148,6 +157,7 @@ public class WorkflowService {
         applyNodoFields(nodo, body);
         WorkflowNodo saved = nodoRepo.save(nodo);
         syncNodoFormDefinition(saved, body);
+        workflowAiProxyService.reloadWorkflowsAsync();
         return hydrateNodoFormDefinition(saved);
     }
 
@@ -156,6 +166,7 @@ public class WorkflowService {
         formRepo.findByNodoId(id).ifPresent(formRepo::delete);
         nodoRepo.deleteById(id);
         transitionRepo.deleteByFromNodoIdOrToNodoId(id, id);
+        workflowAiProxyService.reloadWorkflowsAsync();
     }
 
     public WorkflowTransition createTransition(Map<String, Object> body) {

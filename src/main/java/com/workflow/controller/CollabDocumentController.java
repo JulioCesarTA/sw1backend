@@ -1,12 +1,15 @@
 package com.workflow.controller;
-import com.workflow.model.CollabDocument;
+
 import com.workflow.model.User;
-import com.workflow.service.CollabDocumentService;
+import com.workflow.service.CollabExportService;
+import com.workflow.service.DocumentAccessService;
+import com.workflow.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
+
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -14,81 +17,66 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CollabDocumentController {
 
-    private final CollabDocumentService service;
-    @PostMapping
-    public ResponseEntity<Map<String, Object>> create(
-            @RequestBody Map<String, String> body,
-            @AuthenticationPrincipal User actor) {
-        String tramiteId = body.get("tramiteId");
-        String title = body.get("title");
-        if (tramiteId == null || tramiteId.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "tramiteId es requerido"));
-        }
-        CollabDocument doc = service.create(tramiteId, title, actor);
-        return ResponseEntity.ok(service.toSummary(doc));
-    }
-
-    @GetMapping("/by-tramite/{tramiteId}")
-    public ResponseEntity<List<Map<String, Object>>> listByTramite(@PathVariable String tramiteId) {
-        return ResponseEntity.ok(
-                service.listByTramite(tramiteId).stream().map(service::toSummary).toList()
-        );
-    }
-
-    @GetMapping("/{docId}")
-    public ResponseEntity<Map<String, Object>> getDoc(@PathVariable String docId) {
-        CollabDocument doc = service.getById(docId);
-        Map<String, Object> result = new java.util.LinkedHashMap<>(service.toSummary(doc));
-        result.put("ydocState",      doc.getYdocState()    != null ? doc.getYdocState()    : "");
-        result.put("textSnapshot",   doc.getTextSnapshot() != null ? doc.getTextSnapshot() : "");
-        result.put("initialHtml",    doc.getInitialHtml()  != null ? doc.getInitialHtml()  : "");
-        result.put("fileStoredName", doc.getFileStoredName() != null ? doc.getFileStoredName() : "");
-        return ResponseEntity.ok(result);
-    }
-
-    @DeleteMapping("/{docId}")
-    public ResponseEntity<Void> delete(
-            @PathVariable String docId,
-            @AuthenticationPrincipal User actor) {
-        service.delete(docId, actor);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{docId}/save-state")
-    public ResponseEntity<Map<String, Object>> saveState(
-            @PathVariable String docId,
-            @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(service.saveState(
-                docId,
-                body.get("ydocState"),
-                body.get("textSnapshot"),
-                body.get("userId"),
-                body.get("userName"),
-                body.get("userEmail")
-        ));
-    }
+    private final FileStorageService    fileStorageService;
+    private final CollabExportService   collabExportService;
+    private final DocumentAccessService documentAccessService;
 
     /**
-     * Abre (o reutiliza) un CollabDocument a partir de un archivo del trámite.
-     * Devuelve el doc con initialHtml para que el editor lo cargue si ydocState está vacío.
+     * Abre un archivo para edición colaborativa.
+     * - Lee la versión editada desde S3 si existe, si no el original.
+     * - Devuelve roomId estable (tramiteId_storedName) para que el frontend use como sala STOMP.
+     * - Registra en auditoría que el archivo fue abierto.
      */
     @PostMapping("/open-file")
     public ResponseEntity<Map<String, Object>> openFile(
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal User actor) {
-        String tramiteId  = body.get("tramiteId");
-        String storedName = body.get("storedName");
-        String workflowId = body.get("workflowId");
-        String title      = body.get("title");
+
+        String tramiteId     = body.get("tramiteId");
+        String storedName    = body.get("storedName");
+        String workflowName  = body.get("workflowName");
+        String tramiteFolder = body.get("tramiteFolder");
+        String workflowId    = body.get("workflowId");
+        String title         = body.get("title");
+
         if (tramiteId == null || storedName == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "tramiteId y storedName son requeridos"));
         }
-        CollabDocument doc = service.openFile(tramiteId, storedName, workflowId, title, actor);
-        Map<String, Object> result = new java.util.LinkedHashMap<>(service.toSummary(doc));
-        result.put("ydocState",   doc.getYdocState()   != null ? doc.getYdocState()   : "");
-        result.put("initialHtml", doc.getInitialHtml()  != null ? doc.getInitialHtml()  : "");
-        result.put("fileStoredName", doc.getFileStoredName() != null ? doc.getFileStoredName() : "");
+
+        // roomId: identificador estable de la sala STOMP, sin MongoDB
+        String roomId = tramiteId + "_" + storedName;
+
+        // Auditoría: apertura del editor colaborativo
+        String resolvedTitle = title != null && !title.isBlank() ? title : storedName;
+        documentAccessService.recordCollabOpened(tramiteId, workflowId, storedName, resolvedTitle, actor);
+
+        String initialHtml = "";
+        String gridJson    = null;
+
+        if (workflowName != null && tramiteFolder != null) {
+            try {
+                byte[] bytes = fileStorageService.readBestVersionBytes(storedName, workflowName, tramiteFolder);
+                String lower = storedName.toLowerCase();
+                if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+                    gridJson = collabExportService.xlsxToGridJson(bytes);
+                } else if (lower.endsWith(".docx")) {
+                    initialHtml = collabExportService.readDocxAsHtml(bytes);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("roomId",        roomId);
+        result.put("id",            roomId);   // alias para compatibilidad con router.navigate
+        result.put("title",         resolvedTitle);
+        result.put("fileStoredName", storedName);
+        result.put("initialHtml",   initialHtml);
+        result.put("ydocState",     gridJson != null ? gridJson : "");
+        result.put("workflowName",  workflowName != null ? workflowName : "");
+        result.put("tramiteFolder", tramiteFolder != null ? tramiteFolder : "");
+        result.put("workflowId",    workflowId != null ? workflowId : "");
+        result.put("tramiteId",     tramiteId);
+
         return ResponseEntity.ok(result);
     }
-
 }

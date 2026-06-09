@@ -1,6 +1,8 @@
 package com.workflow.controller;
 
-import com.workflow.service.CollabDocumentService;
+import com.workflow.service.CollabExportService;
+import com.workflow.service.DocumentAccessService;
+import com.workflow.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -12,113 +14,154 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Relays Yjs CRDT updates between browser clients over STOMP.
+ * Relay de edición colaborativa en tiempo real via STOMP.
  *
- * Protocol:
- *   Client → /app/collab-docs/{id}/join         → server sends current ydocState to that user
- *   Client → /app/collab-docs/{id}/update        → server broadcasts update to all subscribers
- *   Client → /app/collab-docs/{id}/save-state    → server persists Yjs state to MongoDB
- *   Client → /app/collab-docs/{id}/presence      → server broadcasts cursor/presence info
+ * roomId = tramiteId + "_" + storedName  (estable, sin MongoDB)
  *
- * All messages are broadcast on /topic/collab-docs/{id}
+ * Protocolo:
+ *   join       → carga archivo desde S3 (editado si existe, si no el original) → envía init
+ *   update     → rebroadcast a todos los suscritos (sin tocar BD)
+ *   save-state → convierte HTML/grid → sube a S3 como .edited.* → registra auditoría
+ *   peer-state → rebroadcast estado completo a usuario específico
+ *   presence   → rebroadcast posición de cursor
  */
 @Controller
 @RequiredArgsConstructor
 public class CollabDocumentWsController {
 
-    private final CollabDocumentService service;
+    private final FileStorageService    fileStorageService;
+    private final CollabExportService   collabExportService;
+    private final DocumentAccessService documentAccessService;
     private final SimpMessagingTemplate messaging;
 
     private static final String TOPIC = "/topic/collab-docs/";
 
-    @MessageMapping("/collab-docs/{docId}/join")
-    public void join(@DestinationVariable String docId,
+    @MessageMapping("/collab-docs/{roomId}/join")
+    public void join(@DestinationVariable String roomId,
                      @Payload Map<String, Object> body) {
         String joiningUserId = str(body.get("userId"));
+        String workflowName  = str(body.get("workflowName"));
+        String tramiteFolder = str(body.get("tramiteFolder"));
+        String storedName    = str(body.get("storedName"));
+        String title         = str(body.get("title"));
 
-        // 1. Send persisted DB state to the joining user
-        String ydocState = "";
-        String docTitle = "";
-        try {
-            var doc = service.getById(docId);
-            ydocState = doc.getYdocState() != null ? doc.getYdocState() : "";
-            docTitle  = doc.getTitle() != null ? doc.getTitle() : "";
-        } catch (Exception ignored) {}
+        String initialHtml = "";
+        String gridJson    = null;
+
+        if (workflowName != null && tramiteFolder != null && storedName != null) {
+            try {
+                byte[] bytes = fileStorageService.readBestVersionBytes(storedName, workflowName, tramiteFolder);
+                String lower = storedName.toLowerCase();
+                if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+                    gridJson = collabExportService.xlsxToGridJson(bytes);
+                } else if (lower.endsWith(".docx")) {
+                    initialHtml = collabExportService.readDocxAsHtml(bytes);
+                }
+            } catch (Exception ignored) {}
+        }
 
         Map<String, Object> initMsg = new HashMap<>();
         initMsg.put("type", "init");
-        initMsg.put("docId", docId);
+        initMsg.put("roomId", roomId);
         initMsg.put("targetUserId", joiningUserId);
-        initMsg.put("ydocState", ydocState);
-        initMsg.put("title", docTitle);
-        messaging.convertAndSend(TOPIC + docId, initMsg);
+        initMsg.put("initialHtml", initialHtml);
+        if (gridJson != null) initMsg.put("gridJson", gridJson);
+        initMsg.put("title", title);
+        messaging.convertAndSend(TOPIC + roomId, initMsg);
 
-        // 2. Ask existing peers to send their live state to the new user
-        //    so the joiner gets any unsaved changes too.
+        // Notificar a pares para que envíen su estado en vivo al nuevo usuario
         Map<String, Object> peerMsg = new HashMap<>();
         peerMsg.put("type", "peer_joined");
-        peerMsg.put("docId", docId);
+        peerMsg.put("roomId", roomId);
         peerMsg.put("joiningUserId", joiningUserId);
-        messaging.convertAndSend(TOPIC + docId, peerMsg);
+        messaging.convertAndSend(TOPIC + roomId, peerMsg);
     }
 
-    @MessageMapping("/collab-docs/{docId}/update")
-    public void update(@DestinationVariable String docId,
+    @MessageMapping("/collab-docs/{roomId}/update")
+    public void update(@DestinationVariable String roomId,
                        @Payload Map<String, Object> body) {
-        String update = str(body.get("update"));
         String userId = str(body.get("userId"));
-        if (update == null || update.isBlank() || userId == null) return;
-
-        Map<String, Object> msg = new HashMap<>();
+        if (userId == null) return;
+        Map<String, Object> msg = new HashMap<>(body);
         msg.put("type", "update");
-        msg.put("docId", docId);
-        msg.put("update", update);
-        msg.put("userId", userId);
-        messaging.convertAndSend(TOPIC + docId, msg);
+        msg.put("roomId", roomId);
+        messaging.convertAndSend(TOPIC + roomId, msg);
     }
 
-    @MessageMapping("/collab-docs/{docId}/save-state")
-    public void saveState(@DestinationVariable String docId,
+    @MessageMapping("/collab-docs/{roomId}/save-state")
+    public void saveState(@DestinationVariable String roomId,
                           @Payload Map<String, Object> body) {
-        String ydocState    = str(body.get("ydocState"));
-        String textSnapshot = str(body.get("textSnapshot"));
-        String userId       = str(body.get("userId"));
-        String userName     = str(body.get("userName"));
-        String userEmail    = str(body.get("userEmail"));
-        if (ydocState == null || ydocState.isBlank()) return;
+        String workflowName  = str(body.get("workflowName"));
+        String tramiteFolder = str(body.get("tramiteFolder"));
+        String storedName    = str(body.get("storedName"));
+        String tramiteId     = str(body.get("tramiteId"));
+        String workflowId    = str(body.get("workflowId"));
+        String title         = str(body.get("title"));
+        String userId        = str(body.get("userId"));
+        String userName      = str(body.get("userName"));
+        String userEmail     = str(body.get("userEmail"));
+        String htmlContent   = str(body.get("htmlContent"));
+        String gridJson      = str(body.get("gridJson"));
+        String textSnapshot  = str(body.get("textSnapshot"));
+
+        if (workflowName == null || tramiteFolder == null || storedName == null) return;
+
         try {
-            service.saveState(docId, ydocState, textSnapshot, userId, userName, userEmail);
+            // Texto anterior para el diff de auditoría
+            String textBefore = "";
+            try {
+                byte[] existing = fileStorageService.readBestVersionBytes(storedName, workflowName, tramiteFolder);
+                textBefore = collabExportService.extractText(storedName, existing);
+            } catch (Exception ignored) {}
+
+            // Convertir contenido y subir a S3
+            byte[] fileBytes = null;
+            String lower = storedName.toLowerCase();
+            if ((lower.endsWith(".xlsx") || lower.endsWith(".xls")) && gridJson != null && !gridJson.isBlank()) {
+                fileBytes = collabExportService.gridJsonToXlsxBytes(gridJson);
+                if (textSnapshot == null || textSnapshot.isBlank()) {
+                    textSnapshot = collabExportService.textFromGridJson(gridJson);
+                }
+            } else if (lower.endsWith(".docx") && htmlContent != null && !htmlContent.isBlank()) {
+                fileBytes = collabExportService.htmlToDocxBytes(htmlContent);
+            }
+
+            if (fileBytes != null) {
+                fileStorageService.storeEditedBytes(fileBytes, storedName, workflowName, tramiteFolder);
+                // Extraer texto del archivo convertido para que la comparación use el mismo método
+                // en ambos lados del diff (evita diferencias de espacios/líneas vacías)
+                textSnapshot = collabExportService.extractText(storedName, fileBytes);
+            }
+
+            // Auditoría documental
+            if (userId != null && textSnapshot != null && !textSnapshot.isBlank()) {
+                documentAccessService.recordCollabEdited(
+                        tramiteId, workflowId, storedName, title,
+                        textBefore, textSnapshot, userId, userName, userEmail);
+            }
         } catch (Exception ignored) {}
     }
 
-    @MessageMapping("/collab-docs/{docId}/peer-state")
-    public void peerState(@DestinationVariable String docId,
+    @MessageMapping("/collab-docs/{roomId}/peer-state")
+    public void peerState(@DestinationVariable String roomId,
                           @Payload Map<String, Object> body) {
-        // A peer is forwarding their full Yjs state to a specific joining user
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", "peer_state");
-        msg.put("docId", docId);
+        msg.put("roomId", roomId);
         msg.put("targetUserId", str(body.get("targetUserId")));
         msg.put("update", str(body.get("update")));
         msg.put("fromUserId", str(body.get("fromUserId")));
-        messaging.convertAndSend(TOPIC + docId, msg);
+        messaging.convertAndSend(TOPIC + roomId, msg);
     }
 
-    @MessageMapping("/collab-docs/{docId}/presence")
-    public void presence(@DestinationVariable String docId,
+    @MessageMapping("/collab-docs/{roomId}/presence")
+    public void presence(@DestinationVariable String roomId,
                          @Payload Map<String, Object> body) {
-        Map<String, Object> msg = new HashMap<>();
+        Map<String, Object> msg = new HashMap<>(body);
         msg.put("type", "presence");
-        msg.put("docId", docId);
-        msg.put("userId", str(body.get("userId")));
-        msg.put("userName", str(body.get("userName")));
-        msg.put("color", str(body.get("color")));
-        msg.put("from", str(body.get("from")));
-        msg.put("to", str(body.get("to")));
-        messaging.convertAndSend(TOPIC + docId, msg);
+        msg.put("roomId", roomId);
+        messaging.convertAndSend(TOPIC + roomId, msg);
     }
 
-    private String str(Object value) {
-        return value != null ? value.toString() : null;
-    }
+    private String str(Object v) { return v != null ? v.toString() : null; }
 }

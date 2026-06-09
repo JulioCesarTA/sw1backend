@@ -51,6 +51,7 @@ public class TramiteService {
     private final WorkflowAiProxyService workflowAiProxyService;
     private final FcmService fcmService;
     private final ReportRealtimeService reportRealtimeService;
+    private final FileStorageService fileStorageService;
     private final List<NodoTipoHandler> nodoTipoHandlers = List.of(
             new NodoDecisionHandler(),
             new NodoIteracionHandler(),
@@ -273,6 +274,11 @@ public class TramiteService {
                     map.put("updatedAt", tramite.getUpdatedAt());
                     return map;
                 })
+                .sorted((a, b) -> {
+                    java.time.Instant ia = toInstant(a.get("createdAt"));
+                    java.time.Instant ib = toInstant(b.get("createdAt"));
+                    return ib.compareTo(ia);
+                })
                 .toList();
     }
 
@@ -310,7 +316,7 @@ public class TramiteService {
         map.put("updatedAt", tramite.getUpdatedAt());
         map.put("history", history);
         map.put("formDefinition", formDefinition);
-        map.put("availableTransitions", canAdvance ? buildAvailableTransitions(currentNodo, transitions) : List.of());
+        map.put("availableTransitions", buildAvailableTransitions(currentNodo, transitions));
         map.put("incomingData", buildIncomingData(tramite, currentNodo, transitions));
         map.put("canAdvance", canAdvance);
         map.put("documentAccess", documentAccessService.resolvePermissions(currentNodo, actor));
@@ -374,7 +380,50 @@ public class TramiteService {
         Tramite saved = tramiteRepo.save(tramite);
         recordHistory(saved.getId(), null, initialNodo.getId(), "CREADO", requestedBy.getId(), "Tramite creado");
         auditFileChanges(null, saved.getFormData(), saved, initialNodo, requestedBy);
+
+        // Renombrar carpeta S3 de UUID → code del trámite
+        String tramiteFolder = (String) body.get("tramiteFolder");
+        if (tramiteFolder != null && !tramiteFolder.isBlank()) {
+            String newFolder = saved.getCode();
+            fileStorageService.moveTramiteFolder(workflow.getName(), tramiteFolder, newFolder);
+            Map<String, Object> updatedFormData = new LinkedHashMap<>(
+                    saved.getFormData() != null ? saved.getFormData() : new LinkedHashMap<>());
+            updateTramiteFolderInFormData(updatedFormData, tramiteFolder, newFolder, workflow.getName());
+            saved.setFormData(updatedFormData);
+            saved = tramiteRepo.save(saved);
+        }
+
         return saved;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void updateTramiteFolderInFormData(Map<String, Object> formData,
+                                               String oldFolder, String newFolder,
+                                               String workflowName) {
+        for (Map.Entry<String, Object> entry : formData.entrySet()) {
+            Object val = entry.getValue();
+            if (val instanceof Map) {
+                patchFileEntry((Map<String, Object>) val, oldFolder, newFolder, workflowName);
+            } else if (val instanceof List) {
+                for (Object item : (List<Object>) val) {
+                    if (item instanceof Map) {
+                        patchFileEntry((Map<String, Object>) item, oldFolder, newFolder, workflowName);
+                    }
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void patchFileEntry(Map<String, Object> fileMap, String oldFolder, String newFolder, String workflowName) {
+        if (!oldFolder.equals(fileMap.get("tramiteFolder"))) return;
+        fileMap.put("tramiteFolder", newFolder);
+        String storedName = (String) fileMap.get("storedName");
+        String fileName   = (String) fileMap.get("fileName");
+        if (storedName != null) {
+            String newUrl = fileStorageService.presignUrl(storedName, workflowName, newFolder, fileName);
+            if (newUrl != null) fileMap.put("downloadPath", newUrl);
+        }
     }
 
     private void validateWorkflowStartAndEnd(List<WorkflowNodo> nodos, List<WorkflowTransition> transitions) {
@@ -1052,6 +1101,14 @@ public class TramiteService {
         if (value instanceof List<?> list) return !list.isEmpty();
         if (value instanceof Map<?, ?> map) return !map.isEmpty();
         return true;
+    }
+
+    private java.time.Instant toInstant(Object v) {
+        if (v == null) return java.time.Instant.EPOCH;
+        if (v instanceof java.time.Instant i) return i;
+        if (v instanceof java.time.LocalDateTime ldt) return ldt.toInstant(java.time.ZoneOffset.UTC);
+        try { return java.time.Instant.parse(v.toString()); } catch (Exception ignored) {}
+        return java.time.Instant.EPOCH;
     }
 
     private boolean hasWorkflowAccess(User actor, Workflow workflow) {

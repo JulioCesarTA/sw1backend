@@ -56,13 +56,42 @@ public class CollabDocumentService {
     }
 
     private String convertFileToHtml(String storedName, String workflowId) {
+        return convertFileToHtml(storedName, workflowId, null);
+    }
+
+    private String convertFileToHtml(String storedName, String workflowId, String downloadPath) {
         try {
-            byte[] fileBytes = fileStorageService.readFileBytes(storedName, workflowId);
+            byte[] fileBytes = null;
+            // Primero intentar con la URL presignada si viene del frontend
+            if (downloadPath != null && !downloadPath.isBlank()) {
+                try { fileBytes = fetchBytesFromUrl(downloadPath); } catch (Exception ignored) {}
+            }
+            // Fallback: leer desde S3 con path legacy
+            if (fileBytes == null || fileBytes.length == 0) {
+                fileBytes = fileStorageService.readFileBytes(storedName, workflowId);
+            }
             String lower = storedName.toLowerCase();
             if (lower.endsWith(".docx")) return collabExportService.readDocxAsHtml(fileBytes);
             if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) return collabExportService.readXlsxAsHtml(fileBytes);
         } catch (Exception ignored) {}
         return "";
+    }
+
+    private byte[] fetchBytesFromUrl(String url) throws java.io.IOException {
+        java.net.HttpURLConnection conn =
+                (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(10_000);
+        conn.setReadTimeout(30_000);
+        if (conn.getResponseCode() >= 400) {
+            conn.disconnect();
+            throw new java.io.IOException("HTTP " + conn.getResponseCode());
+        }
+        try (java.io.InputStream in = conn.getInputStream()) {
+            return in.readAllBytes();
+        } finally {
+            conn.disconnect();
+        }
     }
 
     private CollabDocument reConvert(CollabDocument doc) {
@@ -111,7 +140,7 @@ public class CollabDocumentService {
      * Si no, convierte el archivo a HTML y crea un nuevo CollabDocument con ese contenido.
      */
     public CollabDocument openFile(String tramiteId, String storedName, String workflowId,
-                                   String title, User actor) {
+                                   String title, String downloadPath, User actor) {
         Optional<CollabDocument> existing = repository.findByTramiteIdAndFileStoredName(tramiteId, storedName);
 
         // Stale = initialHtml is the old fallback placeholder (ydocState may still have user edits).
@@ -130,13 +159,19 @@ public class CollabDocumentService {
             return ex;
         }
 
-        String html = convertFileToHtml(storedName, workflowId);
+        String html = convertFileToHtml(storedName, workflowId, downloadPath);
 
         if (stale) {
             CollabDocument doc = existing.get();
             doc.setInitialHtml(html);
             doc.setWorkflowId(workflowId);
             doc.setUpdatedAt(Instant.now());
+            // Si no hay ediciones previas (ydocState vacío o era un placeholder),
+            // resetear ydocState para que el editor cargue desde initialHtml
+            String existingYdoc = doc.getYdocState();
+            if (existingYdoc == null || existingYdoc.isBlank()) {
+                doc.setYdocState(null);
+            }
             return repository.save(doc);
         }
 

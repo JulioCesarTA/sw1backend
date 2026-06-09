@@ -1,6 +1,7 @@
 package com.workflow.service;
 
 import com.workflow.model.WorkflowTransition;
+import com.workflow.service.WorkflowAiProxyService;
 import com.workflow.repository.CompanyRepository;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.FormDefinitionRepository;
@@ -30,7 +31,9 @@ class WorkflowServiceForwardConfigTest {
                 mock(WorkflowTransitionRepository.class),
                 mock(FormDefinitionRepository.class),
                 mock(CompanyRepository.class),
-                mock(DepartmentRepository.class)
+                mock(DepartmentRepository.class),
+                mock(FileStorageService.class),
+                mock(WorkflowAiProxyService.class)
         );
     }
 

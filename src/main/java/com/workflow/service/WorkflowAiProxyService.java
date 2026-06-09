@@ -32,6 +32,9 @@ public class WorkflowAiProxyService {
     @Value("${app.ai.base-url}")
     private String aiBaseUrl;
 
+    @Value("${app.ai.tf-base-url}")
+    private String tfBaseUrl;
+
     private final ObjectMapper objectMapper;
     private final OkHttpClient okHttpClient = new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -67,19 +70,59 @@ public class WorkflowAiProxyService {
         return post("/form-voice-design", body);
     }
 
-    public Map<String, Object> reportGenerate(Map<String, Object> body) {
-        return post("/nlp/report-generate", body);
+    public org.springframework.http.ResponseEntity<byte[]> reportGenerateRaw(Map<String, Object> body) {
+        try {
+            String json = objectMapper.writeValueAsString(body);
+            Request request = new Request.Builder()
+                    .url(tfBaseUrl + "/nlp/report-generate")
+                    .post(RequestBody.create(json, MediaType.parse("application/json; charset=utf-8")))
+                    .build();
+            try (Response response = okHttpClient.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    throw new ResponseStatusException(resolveStatus(response.code()), "Error del servicio de IA");
+                }
+                byte[] bytes = response.body() != null ? response.body().bytes() : new byte[0];
+                String contentType = response.header("Content-Type", "application/json");
+                String contentDisposition = response.header("Content-Disposition", "inline");
+                return org.springframework.http.ResponseEntity.ok()
+                        .header("Content-Type", contentType)
+                        .header("Content-Disposition", contentDisposition)
+                        .body(bytes);
+            }
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo conectar con el servicio de IA: " + e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error proxy del servicio de IA: " + e.getMessage());
+        }
     }
 
     public Map<String, Object> fillForm(Map<String, Object> body) {
-        return post("/nlp/fill-form", body);
+        return postTo(tfBaseUrl, "/nlp/fill-form", body);
+    }
+
+    public Map<String, Object> rankPriorityWorkflow(String workflowId) {
+        return postTo(tfBaseUrl, "/nlp/rank-priority-real/" + workflowId, Map.of());
+    }
+
+    public Map<String, Object> detectAnomaliesWorkflow(String workflowId) {
+        return postTo(tfBaseUrl, "/nlp/detect-anomalies/" + workflowId, Map.of());
+    }
+
+    public void reloadWorkflowsAsync() {
+        Thread.ofVirtual().start(() -> {
+            try {
+                postTo(tfBaseUrl, "/nlp/reload-workflows", Map.of());
+            } catch (Exception ignored) {}
+        });
     }
 
     public org.springframework.http.ResponseEntity<byte[]> reportDownload(Map<String, Object> body) {
         try {
             String json = objectMapper.writeValueAsString(body);
             Request request = new Request.Builder()
-                    .url(aiBaseUrl + "/nlp/download")
+                    .url(tfBaseUrl + "/nlp/download")
                     .post(RequestBody.create(json, MediaType.parse("application/json; charset=utf-8")))
                     .build();
 
@@ -122,7 +165,7 @@ public class WorkflowAiProxyService {
             }
 
             Request request = new Request.Builder()
-                    .url(aiBaseUrl + "/nlp/match-with-docs")
+                    .url(tfBaseUrl + "/nlp/match-with-docs")
                     .post(bodyBuilder.build())
                     .build();
 
@@ -184,11 +227,15 @@ public class WorkflowAiProxyService {
     }
 
     private Map<String, Object> post(String path, Map<String, Object> body) {
+        return postTo(aiBaseUrl, path, body);
+    }
+
+    private Map<String, Object> postTo(String baseUrl, String path, Map<String, Object> body) {
         try {
             String json = objectMapper.writeValueAsString(body);
             HttpResponse<String> response = httpClient.send(
                     HttpRequest.newBuilder()
-                            .uri(URI.create(aiBaseUrl + path))
+                            .uri(URI.create(baseUrl + path))
                             .timeout(Duration.ofSeconds(120))
                             .header("Content-Type", "application/json")
                             .header("Accept", "application/json")

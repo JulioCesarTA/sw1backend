@@ -1,0 +1,84 @@
+C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.1.0)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+INFO:     Started server process [7088]
+INFO:     Waiting for application startup.
+2026-06-09 05:13:02,322 [INFO] main — \u25b6 Iniciando modelos TensorFlow …
+2026-06-09 05:13:07,918 [INFO] ai.document_classifier — DocumentClassifier: 24 categorías (todos los campos del nodo 2).
+C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:103: UserWarning: Argument `input_length` is deprecated. Just remove it.
+  warnings.warn(
+2026-06-09 05:13:07,966 [INFO] ai.document_classifier — Entrenando DocumentClassifier: 25 categorías, 221 ejemplos …
+2026-06-09 05:13:16,603 [INFO] ai.document_classifier — DocumentClassifier listo.
+2026-06-09 05:13:16,621 [INFO] nlp.form_filler — Entrenando FormFiller TF …
+2026-06-09 05:13:20,411 [INFO] nlp.form_filler — FormFiller listo.
+2026-06-09 05:13:21,312 [INFO] reports.data_service — DataService listo (via Spring Boot API).
+2026-06-09 05:13:26,924 [INFO] ai.workflow_matcher — WorkflowMatcher: 9 workflows cargados (campos del nodo 2).
+2026-06-09 05:13:27,479 [INFO] ai.workflow_matcher — WorkflowMatcher listo — 9 workflows.
+2026-06-09 05:13:27,480 [INFO] main — \u2713 Spring Boot API conectada, workflows cargados.
+2026-06-09 05:13:32,826 [INFO] core.api_client — load_workflows: 9 workflows, 32 nodos
+2026-06-09 05:13:33,472 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a27d93d164a6703c9f896c4, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a27d93d164a6703c9f896c4"}, "remainingTimeMS": 8}
+C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\dense.py:107: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
+  super().__init__(activity_regularizer=activity_regularizer, **kwargs)
+2026-06-09 05:13:36,103 [INFO] ai.predictor.delay_predictor — DelayPredictor trained on 261 samples
+2026-06-09 05:13:36,103 [INFO] ai.predictor.delay_predictor — DelayPredictor ready
+2026-06-09 05:13:36,103 [INFO] main — \u2713 DelayPredictor listo.
+2026-06-09 05:13:41,402 [INFO] core.api_client — load_workflows: 9 workflows, 32 nodos
+2026-06-09 05:13:41,424 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a27d945164a6703c9f896c5, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a27d945164a6703c9f896c5"}, "remainingTimeMS": 8}
+2026-06-09 05:13:44,850 [INFO] ai.predictor.bottleneck_predictor — BottleneckPredictor trained on 750 samples
+2026-06-09 05:13:44,850 [INFO] ai.predictor.bottleneck_predictor — BottleneckPredictor ready
+2026-06-09 05:13:44,851 [INFO] main — \u2713 BottleneckPredictor listo.
+2026-06-09 05:13:50,105 [INFO] core.api_client — load_workflows: 9 workflows, 32 nodos
+2026-06-09 05:13:50,121 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a27d94e164a6703c9f896c6, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a27d94e164a6703c9f896c6"}, "remainingTimeMS": 8}
+2026-06-09 05:13:52,251 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Reclamo por Corte de Servicio o Fuga]: entrenado (8 reales + augmentación)
+2026-06-09 05:13:53,573 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Solicitud de Nueva Conexion de Agua]: entrenado (4 reales + augmentación)
+2026-06-09 05:13:54,766 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Gestion de Contrato Comercial]: entrenado (6 reales + augmentación)
+2026-06-09 05:13:55,978 [INFO] ai.predictor.priority_ranker —   PriorityRanker [software1]: entrenado (sintético)
+2026-06-09 05:13:57,135 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Reconexion de Servicio de Agua]: entrenado (5 reales + augmentación)
+2026-06-09 05:13:58,285 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
+2026-06-09 05:13:59,456 [INFO] ai.predictor.priority_ranker —   PriorityRanker [hola]: entrenado (sintético)
+2026-06-09 05:14:00,656 [INFO] ai.predictor.priority_ranker —   PriorityRanker [pruebaaaa]: entrenado (sintético)
+2026-06-09 05:14:01,845 [INFO] ai.predictor.priority_ranker —   PriorityRanker [prueba]: entrenado (sintético)
+2026-06-09 05:14:01,845 [INFO] ai.predictor.priority_ranker — PriorityRanker listo — modelos entrenados: 9
+2026-06-09 05:14:01,845 [INFO] main — \u2713 PriorityRanker listo.
+2026-06-09 05:14:07,059 [INFO] core.api_client — load_workflows: 9 workflows, 32 nodos
+2026-06-09 05:14:07,075 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a27d95f164a6703c9f896c7, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a27d95f164a6703c9f896c7"}, "remainingTimeMS": 8}
+2026-06-09 05:14:10,358 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Reclamo por Corte de Servicio o Fuga]: entrenado (6 reales + augmentación) — threshold=0.1033
+WARNING:tensorflow:5 out of the last 17 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000021857C8B4C0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-09 05:14:12,654 [WARNING] tensorflow — 5 out of the last 17 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000021857C8B4C0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-09 05:14:12,670 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Solicitud de Nueva Conexion de Agua]: entrenado (sintético) — threshold=0.0598
+WARNING:tensorflow:6 out of the last 18 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000021859EAF880> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-09 05:14:14,887 [WARNING] tensorflow — 6 out of the last 18 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000021859EAF880> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-09 05:14:14,918 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Gestion de Contrato Comercial]: entrenado (6 reales + augmentación) — threshold=0.0446
+2026-06-09 05:14:17,516 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [software1]: entrenado (sintético) — threshold=0.0564
+2026-06-09 05:14:20,041 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Reconexion de Servicio de Agua]: entrenado (5 reales + augmentación) — threshold=0.0583
+2026-06-09 05:14:22,504 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación) — threshold=0.1143
+2026-06-09 05:14:24,830 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [pruebaaaa]: entrenado (sintético) — threshold=0.0699
+2026-06-09 05:14:27,424 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [hola]: entrenado (sintético) — threshold=0.0683
+2026-06-09 05:14:30,006 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [prueba]: entrenado (sintético) — threshold=0.0925
+2026-06-09 05:14:30,007 [INFO] ai.predictor.anomaly_detector — AnomalyDetector listo — modelos: 9
+2026-06-09 05:14:30,007 [INFO] main — \u2713 AnomalyDetector listo.
+2026-06-09 05:14:30,007 [INFO] main — \u2713 Servicio listo en http://localhost:8001
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+2026-06-09 05:14:53,461 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:15:05,388 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:15:10,203 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:15:15,175 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:15:21,443 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:15:24,172 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:16:32,331 [INFO] reports.data_service — DataService: 68 tramites.
+2026-06-09 05:19:46,731 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:20:01,641 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:20:10,797 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:21:40,261 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
+2026-06-09 05:21:58,493 [INFO] ai.workflow_matcher — WorkflowMatcher: 9 workflows cargados (campos del nodo 2).
+2026-06-09 05:21:58,987 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 9 workflows.
+2026-06-09 05:25:28,393 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
+2026-06-09 05:25:39,445 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación) — threshold=0.1176
+2026-06-09 05:25:39,445 [INFO] ai.predictor.anomaly_detector — AnomalyDetector re-entrenado para [Alta de Nuevo Contrato de Servicio] — 5 muestras normales
+2026-06-09 05:27:13,874 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
+2026-06-09 05:29:24,696 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
+2026-06-09 05:30:08,821 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
+2026-06-09 05:31:57,077 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación) — threshold=0.0481
+2026-06-09 05:31:57,077 [INFO] ai.predictor.anomaly_detector — AnomalyDetector re-entrenado para [Alta de Nuevo Contrato de Servicio] — 5 muestras normales
+2026-06-09 05:32:59,326 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
+2026-06-09 05:33:34,116 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)

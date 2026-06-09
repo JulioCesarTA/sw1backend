@@ -1,5 +1,6 @@
 package com.workflow.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
@@ -28,6 +29,7 @@ public class FormDefinition {
         private String name;
         private FieldType type;
         private List<GridColumn> columns;
+        @JsonProperty("isRequired")
         private boolean isRequired = false;
         private int order;
     }
