@@ -26,9 +26,9 @@ public class FcmService {
                             .build())
                     .build();
             String response = FirebaseMessaging.getInstance().send(message);
-            log.debug("Notificación FCM enviada: {}", response);
+            log.info("Notificación FCM enviada OK — messageId: {}", response);
         } catch (Exception e) {
-            log.error("Error enviando notificación FCM: {}", e.getMessage());
+            log.error("Error enviando notificación FCM token=[{}]: {}", fcmToken.substring(0, Math.min(20, fcmToken.length())), e.getMessage());
         }
     }
 }

@@ -1,0 +1,238 @@
+C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.1.0)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+INFO:     Started server process [4032]
+INFO:     Waiting for application startup.
+2026-06-10 13:29:16,324 [INFO] main — \u25b6 Iniciando modelos TensorFlow …
+2026-06-10 13:29:17,824 [INFO] ai.document_classifier — DocumentClassifier: 4 categorías (todos los campos del nodo 2).
+C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:103: UserWarning: Argument `input_length` is deprecated. Just remove it.
+  warnings.warn(
+2026-06-10 13:29:17,989 [INFO] ai.document_classifier — Entrenando DocumentClassifier: 5 categorías, 41 ejemplos …
+2026-06-10 13:29:23,939 [INFO] ai.document_classifier — DocumentClassifier listo.
+2026-06-10 13:29:23,955 [INFO] nlp.form_filler — Entrenando FormFiller TF …
+2026-06-10 13:29:27,503 [INFO] nlp.form_filler — FormFiller listo.
+2026-06-10 13:29:27,801 [INFO] reports.data_service — DataService listo (via Spring Boot API).
+2026-06-10 13:29:29,033 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 13:29:29,116 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 13:29:29,116 [INFO] ai.workflow_matcher — WorkflowMatcher listo — 1 workflows.
+2026-06-10 13:29:29,116 [INFO] main — \u2713 Spring Boot API conectada, workflows cargados.
+2026-06-10 13:29:30,073 [INFO] core.api_client — load_workflows: 1 workflows, 6 nodos
+2026-06-10 13:29:30,869 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a299efafecf1e9146d3a65b, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a299efafecf1e9146d3a65b"}, "remainingTimeMS": 8}
+2026-06-10 13:29:32,018 [WARNING] ai.predictor.delay_predictor — DelayPredictor: datos insuficientes, se usará solo hist_rate
+2026-06-10 13:29:32,018 [INFO] ai.predictor.delay_predictor — DelayPredictor listo
+2026-06-10 13:29:32,019 [INFO] main — \u2713 DelayPredictor listo.
+2026-06-10 13:29:32,973 [INFO] core.api_client — load_workflows: 1 workflows, 6 nodos
+2026-06-10 13:29:32,996 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a299efcfecf1e9146d3a65c, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a299efcfecf1e9146d3a65c"}, "remainingTimeMS": 8}
+2026-06-10 13:29:34,074 [WARNING] ai.predictor.bottleneck_predictor — BottleneckPredictor: insufficient data, using synthetic
+C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\dense.py:107: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
+  super().__init__(activity_regularizer=activity_regularizer, **kwargs)
+2026-06-10 13:29:35,472 [INFO] ai.predictor.bottleneck_predictor — BottleneckPredictor trained on 80 samples
+2026-06-10 13:29:35,472 [INFO] ai.predictor.bottleneck_predictor — BottleneckPredictor ready
+2026-06-10 13:29:35,473 [INFO] main — \u2713 BottleneckPredictor listo.
+2026-06-10 13:29:36,426 [INFO] core.api_client — load_workflows: 1 workflows, 6 nodos
+2026-06-10 13:29:36,452 [INFO] ai.predictor.priority_ranker — PriorityRanker listo
+2026-06-10 13:29:36,452 [INFO] main — \u2713 PriorityRanker listo.
+2026-06-10 13:29:37,554 [INFO] core.api_client — load_workflows: 1 workflows, 6 nodos
+2026-06-10 13:29:37,590 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a299f01fecf1e9146d3a65e, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a299f01fecf1e9146d3a65e"}, "remainingTimeMS": 8}
+2026-06-10 13:29:40,668 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Instalacion de Medidor]: entrenado con 1 trámites reales — threshold=0.1181
+2026-06-10 13:29:40,668 [INFO] ai.predictor.anomaly_detector — AnomalyDetector listo — modelos: 1
+2026-06-10 13:29:40,668 [INFO] main — \u2713 AnomalyDetector listo.
+2026-06-10 13:29:40,668 [INFO] main — \u2713 Servicio listo en http://localhost:8001
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:58955 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58863 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61116 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61116 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
+WARNING:tensorflow:5 out of the last 9 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x000001785939BA60> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-10 13:44:00,183 [WARNING] tensorflow — 5 out of the last 9 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x000001785939BA60> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+INFO:     127.0.0.1:65441 - "POST /nlp/fill-form HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51809 - "POST /nlp/fill-form HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55016 - "POST /nlp/fill-form HTTP/1.1" 200 OK
+2026-06-10 13:46:47,588 [INFO] reports.data_service — DataService.get_all_enriched: 2 tramites.
+INFO:     127.0.0.1:57641 - "POST /nlp/report-generate HTTP/1.1" 200 OK
+2026-06-10 13:52:05,558 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+WARNING:tensorflow:5 out of the last 11 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x000001785B4C6FC0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-10 13:52:05,634 [WARNING] tensorflow — 5 out of the last 11 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x000001785B4C6FC0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-10 13:52:05,648 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 13:52:05,648 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:63062 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 13:52:07,615 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 13:52:07,717 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 13:52:07,717 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:63062 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 13:52:28,812 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 13:52:28,910 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 13:52:28,910 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:63062 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 13:52:30,160 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 13:52:30,256 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 13:52:30,256 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:57837 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 13:52:31,500 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 13:52:31,591 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 13:52:31,592 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:63062 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 13:52:41,745 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 13:52:41,832 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 13:52:41,832 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:61823 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 13:53:01,728 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 13:53:01,822 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 13:53:01,822 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:61823 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:01:54,204 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:01:54,290 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:01:54,290 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:62939 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:01:55,594 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:01:55,671 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:01:55,672 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49834 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:02:26,925 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:02:27,046 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:02:27,047 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49839 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:02:28,880 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:02:28,981 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:02:28,981 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49839 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:02:30,297 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:02:30,390 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:02:30,390 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:55854 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:02:31,692 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:02:31,774 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:02:31,775 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49839 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:03:41,041 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:03:41,142 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:03:41,142 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49615 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:03:42,477 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:03:42,555 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:03:42,555 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49620 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:03,817 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:03,906 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:03,906 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49615 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:05,223 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:05,323 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:05,323 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:55254 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:06,630 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:06,713 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:06,713 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:65448 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:08,065 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:08,144 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:08,144 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49615 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:11,758 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:11,852 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:11,852 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:65448 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:13,545 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:13,623 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:13,623 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:49615 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:14,873 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:14,959 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:14,959 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:65448 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:56,009 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:56,087 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:56,087 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:59356 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:04:58,334 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:04:58,582 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:04:58,582 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:59356 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:05:02,759 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:05:02,839 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:05:02,839 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:59356 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:05:04,058 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:05:04,140 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:05:04,140 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:57962 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:06:19,847 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:06:19,931 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:06:19,931 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:51041 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:06:21,160 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:06:21,245 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:06:21,245 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:51046 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:06:28,017 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:06:28,133 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:06:28,133 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:51041 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:06:30,869 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:06:30,970 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:06:30,970 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:51041 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:06:39,901 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:06:39,981 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:06:39,981 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:51041 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:00,103 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:00,194 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:00,194 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:60991 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:04,044 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:04,136 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:04,136 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:60991 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:05,360 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:05,461 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:05,462 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:51797 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:16,840 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:16,934 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:16,934 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:64818 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:19,841 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:19,933 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:19,933 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:64818 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:21,805 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:21,895 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:21,896 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:64818 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:23,165 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:23,254 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:23,254 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:60116 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:24,694 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:24,777 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:24,777 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:64818 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:07:26,000 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:07:26,081 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:07:26,081 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:60116 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:17:49,478 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:17:49,566 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:17:49,566 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:53465 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:17:50,745 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:17:50,822 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:17:50,823 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:60853 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:18:19,815 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:18:19,916 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:18:19,916 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:53465 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:18:21,190 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:18:21,294 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:18:21,295 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:52239 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:18:29,978 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:18:30,070 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:18:30,070 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:60057 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+2026-06-10 14:18:34,319 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 14:18:34,419 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 14:18:34,420 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:60057 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK

@@ -602,6 +602,10 @@ public class TramiteService {
         if (isFinal) {
             sendStatusNotification(saved, "Trámite completado",
                     "Tu trámite " + saved.getCode() + " ha sido completado exitosamente.");
+        } else {
+            String nodoName = advanceCursor.toNodo != null ? advanceCursor.toNodo.getName() : "siguiente etapa";
+            sendStatusNotification(saved, "Trámite en progreso",
+                    "Tu trámite " + saved.getCode() + " avanzó al paso: " + nodoName + ".");
         }
 
         String fromNodoForBifurcasion = advanceCursor.bifurcasionPassthroughId != null ? advanceCursor.bifurcasionPassthroughId : previousNodoId;
