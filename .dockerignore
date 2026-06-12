@@ -3,3 +3,7 @@ target
 tmp_report_inspect
 uploads
 *.log
+.env
+.env.*
+Tensorflow
+IA

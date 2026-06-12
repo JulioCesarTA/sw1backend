@@ -18,9 +18,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SPRING_API   = os.getenv("SPRING_API_URL",  "http://localhost:8080/api")
-SPRING_EMAIL = os.getenv("SPRING_EMAIL",    "juan@gmail.com")
-SPRING_PASS  = os.getenv("SPRING_PASSWORD", "julioavila")
+SPRING_API   = os.getenv("SPRING_API_URL",  "http://backend:8080/api")
+SPRING_EMAIL = os.getenv("SPRING_EMAIL",    "")
+SPRING_PASS  = os.getenv("SPRING_PASSWORD", "")
 MONGO_URI    = os.getenv("MONGODB_URI",     "")
 MONGO_DB     = os.getenv("MONGODB_DB",      "workflow_db")
 

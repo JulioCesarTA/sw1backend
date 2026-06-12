@@ -5,5 +5,6 @@ __pycache__
 .env
 .env.*
 *.log
-ia.log
-ia_err.log
+tf_log.txt
+tf_err.txt
+static/models
