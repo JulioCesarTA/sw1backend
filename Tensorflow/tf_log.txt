@@ -236,3 +236,12 @@ INFO:     127.0.0.1:60057 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
 2026-06-10 14:18:34,419 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
 2026-06-10 14:18:34,420 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
 INFO:     127.0.0.1:60057 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58981 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58996 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57123 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57131 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57138 - "POST /nlp/match-with-docs HTTP/1.1" 200 OK
+2026-06-10 15:00:41,470 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-10 15:00:41,591 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-10 15:00:41,591 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+INFO:     127.0.0.1:56452 - "POST /nlp/reload-workflows HTTP/1.1" 200 OK

@@ -1,84 +1,268 @@
 C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.1.0)/charset_normalizer (3.4.5) doesn't match a supported version!
   warnings.warn(
-INFO:     Started server process [7088]
+INFO:     Started server process [11948]
 INFO:     Waiting for application startup.
-2026-06-09 05:13:02,322 [INFO] main — \u25b6 Iniciando modelos TensorFlow …
-2026-06-09 05:13:07,918 [INFO] ai.document_classifier — DocumentClassifier: 24 categorías (todos los campos del nodo 2).
+2026-06-11 21:39:38,969 [INFO] main — \u25b6 Iniciando modelos TensorFlow …
+2026-06-11 21:39:40,699 [INFO] ai.document_classifier — DocumentClassifier: 6 categorías (todos los campos del nodo 2).
 C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:103: UserWarning: Argument `input_length` is deprecated. Just remove it.
   warnings.warn(
-2026-06-09 05:13:07,966 [INFO] ai.document_classifier — Entrenando DocumentClassifier: 25 categorías, 221 ejemplos …
-2026-06-09 05:13:16,603 [INFO] ai.document_classifier — DocumentClassifier listo.
-2026-06-09 05:13:16,621 [INFO] nlp.form_filler — Entrenando FormFiller TF …
-2026-06-09 05:13:20,411 [INFO] nlp.form_filler — FormFiller listo.
-2026-06-09 05:13:21,312 [INFO] reports.data_service — DataService listo (via Spring Boot API).
-2026-06-09 05:13:26,924 [INFO] ai.workflow_matcher — WorkflowMatcher: 9 workflows cargados (campos del nodo 2).
-2026-06-09 05:13:27,479 [INFO] ai.workflow_matcher — WorkflowMatcher listo — 9 workflows.
-2026-06-09 05:13:27,480 [INFO] main — \u2713 Spring Boot API conectada, workflows cargados.
-2026-06-09 05:13:32,826 [INFO] core.api_client — load_workflows: 9 workflows, 32 nodos
-2026-06-09 05:13:33,472 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a27d93d164a6703c9f896c4, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a27d93d164a6703c9f896c4"}, "remainingTimeMS": 8}
+2026-06-11 21:39:40,886 [INFO] ai.document_classifier — Entrenando DocumentClassifier: 7 categorías, 51 ejemplos …
+2026-06-11 21:39:47,465 [INFO] ai.document_classifier — DocumentClassifier listo.
+2026-06-11 21:39:47,480 [INFO] nlp.form_filler — Entrenando FormFiller TF …
+2026-06-11 21:39:51,245 [INFO] nlp.form_filler — FormFiller listo.
+2026-06-11 21:39:51,543 [INFO] reports.data_service — DataService listo (via Spring Boot API).
+2026-06-11 21:39:52,826 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:39:52,919 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:39:52,919 [INFO] ai.workflow_matcher — WorkflowMatcher listo — 1 workflows.
+2026-06-11 21:39:52,919 [INFO] main — \u2713 Spring Boot API conectada, workflows cargados.
+2026-06-11 21:39:53,862 [INFO] core.api_client — load_workflows: 1 workflows, 6 nodos
+2026-06-11 21:39:54,716 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a2b636ae2c9e324037cd510, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a2b636ae2c9e324037cd510"}, "remainingTimeMS": 8}
+2026-06-11 21:39:55,871 [WARNING] ai.predictor.delay_predictor — DelayPredictor: datos insuficientes, se usará solo hist_rate
+2026-06-11 21:39:55,871 [INFO] ai.predictor.delay_predictor — DelayPredictor listo
+2026-06-11 21:39:55,873 [INFO] main — \u2713 DelayPredictor listo.
+2026-06-11 21:39:56,826 [INFO] core.api_client — load_workflows: 1 workflows, 6 nodos
+2026-06-11 21:39:56,860 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a2b636ce2c9e324037cd511, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a2b636ce2c9e324037cd511"}, "remainingTimeMS": 8}
+2026-06-11 21:39:57,704 [WARNING] ai.predictor.bottleneck_predictor — BottleneckPredictor: insufficient data, using synthetic
 C:\Users\jtorr\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\dense.py:107: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
   super().__init__(activity_regularizer=activity_regularizer, **kwargs)
-2026-06-09 05:13:36,103 [INFO] ai.predictor.delay_predictor — DelayPredictor trained on 261 samples
-2026-06-09 05:13:36,103 [INFO] ai.predictor.delay_predictor — DelayPredictor ready
-2026-06-09 05:13:36,103 [INFO] main — \u2713 DelayPredictor listo.
-2026-06-09 05:13:41,402 [INFO] core.api_client — load_workflows: 9 workflows, 32 nodos
-2026-06-09 05:13:41,424 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a27d945164a6703c9f896c5, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a27d945164a6703c9f896c5"}, "remainingTimeMS": 8}
-2026-06-09 05:13:44,850 [INFO] ai.predictor.bottleneck_predictor — BottleneckPredictor trained on 750 samples
-2026-06-09 05:13:44,850 [INFO] ai.predictor.bottleneck_predictor — BottleneckPredictor ready
-2026-06-09 05:13:44,851 [INFO] main — \u2713 BottleneckPredictor listo.
-2026-06-09 05:13:50,105 [INFO] core.api_client — load_workflows: 9 workflows, 32 nodos
-2026-06-09 05:13:50,121 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a27d94e164a6703c9f896c6, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a27d94e164a6703c9f896c6"}, "remainingTimeMS": 8}
-2026-06-09 05:13:52,251 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Reclamo por Corte de Servicio o Fuga]: entrenado (8 reales + augmentación)
-2026-06-09 05:13:53,573 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Solicitud de Nueva Conexion de Agua]: entrenado (4 reales + augmentación)
-2026-06-09 05:13:54,766 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Gestion de Contrato Comercial]: entrenado (6 reales + augmentación)
-2026-06-09 05:13:55,978 [INFO] ai.predictor.priority_ranker —   PriorityRanker [software1]: entrenado (sintético)
-2026-06-09 05:13:57,135 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Reconexion de Servicio de Agua]: entrenado (5 reales + augmentación)
-2026-06-09 05:13:58,285 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
-2026-06-09 05:13:59,456 [INFO] ai.predictor.priority_ranker —   PriorityRanker [hola]: entrenado (sintético)
-2026-06-09 05:14:00,656 [INFO] ai.predictor.priority_ranker —   PriorityRanker [pruebaaaa]: entrenado (sintético)
-2026-06-09 05:14:01,845 [INFO] ai.predictor.priority_ranker —   PriorityRanker [prueba]: entrenado (sintético)
-2026-06-09 05:14:01,845 [INFO] ai.predictor.priority_ranker — PriorityRanker listo — modelos entrenados: 9
-2026-06-09 05:14:01,845 [INFO] main — \u2713 PriorityRanker listo.
-2026-06-09 05:14:07,059 [INFO] core.api_client — load_workflows: 9 workflows, 32 nodos
-2026-06-09 05:14:07,075 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a27d95f164a6703c9f896c7, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a27d95f164a6703c9f896c7"}, "remainingTimeMS": 8}
-2026-06-09 05:14:10,358 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Reclamo por Corte de Servicio o Fuga]: entrenado (6 reales + augmentación) — threshold=0.1033
-WARNING:tensorflow:5 out of the last 17 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000021857C8B4C0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
-2026-06-09 05:14:12,654 [WARNING] tensorflow — 5 out of the last 17 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000021857C8B4C0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
-2026-06-09 05:14:12,670 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Solicitud de Nueva Conexion de Agua]: entrenado (sintético) — threshold=0.0598
-WARNING:tensorflow:6 out of the last 18 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000021859EAF880> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
-2026-06-09 05:14:14,887 [WARNING] tensorflow — 6 out of the last 18 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000021859EAF880> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
-2026-06-09 05:14:14,918 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Gestion de Contrato Comercial]: entrenado (6 reales + augmentación) — threshold=0.0446
-2026-06-09 05:14:17,516 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [software1]: entrenado (sintético) — threshold=0.0564
-2026-06-09 05:14:20,041 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Reconexion de Servicio de Agua]: entrenado (5 reales + augmentación) — threshold=0.0583
-2026-06-09 05:14:22,504 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación) — threshold=0.1143
-2026-06-09 05:14:24,830 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [pruebaaaa]: entrenado (sintético) — threshold=0.0699
-2026-06-09 05:14:27,424 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [hola]: entrenado (sintético) — threshold=0.0683
-2026-06-09 05:14:30,006 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [prueba]: entrenado (sintético) — threshold=0.0925
-2026-06-09 05:14:30,007 [INFO] ai.predictor.anomaly_detector — AnomalyDetector listo — modelos: 9
-2026-06-09 05:14:30,007 [INFO] main — \u2713 AnomalyDetector listo.
-2026-06-09 05:14:30,007 [INFO] main — \u2713 Servicio listo en http://localhost:8001
+2026-06-11 21:39:59,289 [INFO] ai.predictor.bottleneck_predictor — BottleneckPredictor trained on 80 samples
+2026-06-11 21:39:59,290 [INFO] ai.predictor.bottleneck_predictor — BottleneckPredictor ready
+2026-06-11 21:39:59,290 [INFO] main — \u2713 BottleneckPredictor listo.
+2026-06-11 21:40:00,238 [INFO] core.api_client — load_workflows: 1 workflows, 6 nodos
+2026-06-11 21:40:00,264 [INFO] ai.predictor.priority_ranker — PriorityRanker listo
+2026-06-11 21:40:00,264 [INFO] main — \u2713 PriorityRanker listo.
+2026-06-11 21:40:01,207 [INFO] core.api_client — load_workflows: 1 workflows, 6 nodos
+2026-06-11 21:40:01,231 [INFO] pymongo.serverSelection — {"message": "Waiting for suitable server to become available", "selector": "Primary()", "operation": "find", "topologyDescription": "<TopologyDescription id: 6a2b6371e2c9e324037cd513, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-9svjp6i-shard-00-00.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-01.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-9svjp6i-shard-00-02.y8xvodm.mongodb.net', 27017) server_type: Unknown, rtt: None>]>", "clientId": {"$oid": "6a2b6371e2c9e324037cd513"}, "remainingTimeMS": 8}
+2026-06-11 21:40:02,157 [INFO] ai.predictor.anomaly_detector — AnomalyDetector listo — modelos: 0
+2026-06-11 21:40:02,158 [INFO] main — \u2713 AnomalyDetector listo.
+2026-06-11 21:40:02,158 [INFO] main — \u2713 Servicio listo en http://localhost:8001
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
-2026-06-09 05:14:53,461 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:15:05,388 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:15:10,203 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:15:15,175 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:15:21,443 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:15:24,172 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:16:32,331 [INFO] reports.data_service — DataService: 68 tramites.
-2026-06-09 05:19:46,731 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:20:01,641 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:20:10,797 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:21:40,261 [INFO] reports.data_service — DataService.get_all_enriched: 68 tramites.
-2026-06-09 05:21:58,493 [INFO] ai.workflow_matcher — WorkflowMatcher: 9 workflows cargados (campos del nodo 2).
-2026-06-09 05:21:58,987 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 9 workflows.
-2026-06-09 05:25:28,393 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
-2026-06-09 05:25:39,445 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación) — threshold=0.1176
-2026-06-09 05:25:39,445 [INFO] ai.predictor.anomaly_detector — AnomalyDetector re-entrenado para [Alta de Nuevo Contrato de Servicio] — 5 muestras normales
-2026-06-09 05:27:13,874 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
-2026-06-09 05:29:24,696 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
-2026-06-09 05:30:08,821 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
-2026-06-09 05:31:57,077 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación) — threshold=0.0481
-2026-06-09 05:31:57,077 [INFO] ai.predictor.anomaly_detector — AnomalyDetector re-entrenado para [Alta de Nuevo Contrato de Servicio] — 5 muestras normales
-2026-06-09 05:32:59,326 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
-2026-06-09 05:33:34,116 [INFO] ai.predictor.priority_ranker —   PriorityRanker [Alta de Nuevo Contrato de Servicio]: entrenado (5 reales + augmentación)
+2026-06-11 21:47:47,725 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:47:47,816 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:47:47,817 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:47:48,969 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:47:49,059 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:47:49,059 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:47:51,607 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:47:51,698 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:47:51,698 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:47:52,898 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+WARNING:tensorflow:5 out of the last 5 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x000001737B302E80> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-11 21:47:52,983 [WARNING] tensorflow — 5 out of the last 5 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x000001737B302E80> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-11 21:47:53,000 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:47:53,000 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:47:54,271 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+WARNING:tensorflow:6 out of the last 6 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x000001737B47DE40> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-11 21:47:54,345 [WARNING] tensorflow — 6 out of the last 6 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x000001737B47DE40> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2026-06-11 21:47:54,360 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:47:54,361 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:47:55,640 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:47:55,731 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:47:55,731 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:47:56,961 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:47:57,066 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:47:57,067 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:47:58,329 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:47:58,419 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:47:58,420 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:48:44,527 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:48:44,615 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:48:44,615 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:50:15,704 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:50:15,786 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:50:15,787 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:50:58,285 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:50:58,372 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:50:58,373 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:52:38,853 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:52:38,934 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:52:38,934 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 21:52:40,096 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 21:52:40,178 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 21:52:40,178 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:01:26,214 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:01:26,310 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:01:26,310 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:13,592 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:13,672 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:13,673 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:14,795 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:14,876 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:14,876 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:22,740 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:22,833 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:22,833 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:23,961 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:24,047 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:24,047 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:25,307 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:25,400 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:25,400 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:26,569 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:26,690 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:26,690 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:27,885 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:27,967 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:27,968 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:29,116 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:29,194 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:29,195 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:02:30,352 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:02:30,440 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:02:30,440 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:08:51,313 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:08:51,396 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:08:51,397 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:10:55,759 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:10:55,853 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:10:55,854 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:10:57,171 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:10:57,257 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:10:57,257 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:10:58,719 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:10:58,803 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:10:58,804 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:11:00,354 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:11:00,436 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:11:00,436 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:11:01,988 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:11:02,084 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:11:02,085 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:11:03,316 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:11:03,399 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:11:03,399 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:28:14,140 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:28:14,222 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:28:14,222 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-11 22:28:15,511 [INFO] ai.workflow_matcher — WorkflowMatcher: 1 workflows cargados (campos del nodo 2).
+2026-06-11 22:28:15,600 [INFO] ai.workflow_matcher — WorkflowMatcher encoder sin entrenar (1 workflow)
+2026-06-11 22:28:15,600 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 1 workflows.
+2026-06-12 03:13:12,764 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:13:40,689 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:37:45,321 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:38:49,537 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:39:11,328 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:39:17,353 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:39:35,341 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:39:42,812 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:39:45,893 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:40:01,665 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:40:20,947 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:40:29,228 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:40:41,178 [INFO] reports.data_service — DataService.get_all_enriched: 4 tramites.
+2026-06-12 03:52:34,769 [ERROR] nlp.document_reader — Error leyendo New Microsoft Word Document.docx: File is not a zip file
+2026-06-12 03:53:09,733 [ERROR] nlp.document_reader — Error leyendo New Microsoft Word Document.docx: File is not a zip file
+2026-06-12 03:53:12,182 [ERROR] nlp.document_reader — Error leyendo New Microsoft Word Document.docx: File is not a zip file
+2026-06-12 03:53:19,468 [ERROR] nlp.document_reader — Error leyendo New Microsoft Word Document.docx: File is not a zip file
+2026-06-12 03:53:25,785 [ERROR] nlp.document_reader — Error leyendo New Microsoft Word Document.docx: File is not a zip file
+2026-06-12 03:56:18,531 [INFO] ai.workflow_matcher — WorkflowMatcher: 2 workflows cargados (campos del nodo 2).
+2026-06-12 03:56:22,405 [INFO] ai.workflow_matcher —   Encoder entrenado — 28 muestras, 2 clases
+2026-06-12 03:56:22,521 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 03:56:22,521 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 2 workflows.
+2026-06-12 03:56:34,442 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 03:56:37,683 [INFO] ai.workflow_matcher —   Encoder entrenado — 38 muestras, 3 clases
+2026-06-12 03:56:37,866 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 03:56:37,867 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 03:57:11,067 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 03:57:14,075 [INFO] ai.workflow_matcher —   Encoder entrenado — 38 muestras, 3 clases
+2026-06-12 03:57:14,235 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 03:57:14,236 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 03:57:16,493 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 03:57:19,637 [INFO] ai.workflow_matcher —   Encoder entrenado — 38 muestras, 3 clases
+2026-06-12 03:57:19,805 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 03:57:19,806 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 03:58:38,377 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 03:58:41,495 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 03:58:41,663 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 03:58:41,663 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 03:58:51,565 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 03:58:54,583 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 03:58:54,756 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 03:58:54,756 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:00:34,826 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:00:37,929 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:00:38,126 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:00:38,126 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:00:52,851 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:00:55,863 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:00:56,035 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:00:56,037 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:00:58,288 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:01:01,579 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:01:01,750 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:01:01,751 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:01:03,989 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:01:07,062 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:01:07,229 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:01:07,230 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:01:09,469 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:01:12,576 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:01:12,735 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:01:12,735 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:01:14,974 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:01:17,943 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:01:18,104 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:01:18,105 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:02:36,708 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:02:39,688 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:02:39,863 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:02:39,864 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:03:19,416 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:03:22,594 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:03:22,777 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:03:22,777 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:03:25,021 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:03:28,211 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:03:28,389 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:03:28,390 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:03:30,611 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:03:33,690 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:03:33,869 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:03:33,870 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:03:36,149 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:03:39,243 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:03:39,405 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:03:39,406 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:03:41,608 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:03:45,057 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:03:45,224 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:03:45,224 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:03:47,462 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:03:50,675 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:03:50,838 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:03:50,839 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:03:53,069 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:03:56,240 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:03:56,406 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:03:56,406 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:03:58,594 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:04:01,757 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:04:01,936 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:04:01,936 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:04:04,146 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:04:07,253 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:04:07,397 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:04:07,397 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:04:09,661 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:04:12,871 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:04:13,049 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:04:13,049 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:04:15,256 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:04:18,488 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:04:18,654 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:04:18,655 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:04:20,878 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:04:23,864 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:04:24,023 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:04:24,023 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:04:26,257 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:04:29,364 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:04:29,521 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:04:29,521 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:04:31,778 [INFO] ai.workflow_matcher — WorkflowMatcher: 3 workflows cargados (campos del nodo 2).
+2026-06-12 04:04:34,739 [INFO] ai.workflow_matcher —   Encoder entrenado — 35 muestras, 3 clases
+2026-06-12 04:04:34,897 [INFO] ai.workflow_matcher — WorkflowMatcher encoder entrenado
+2026-06-12 04:04:34,897 [INFO] ai.workflow_matcher — WorkflowMatcher recargado — 3 workflows.
+2026-06-12 04:34:14,631 [INFO] ai.predictor.anomaly_detector —   AnomalyDetector [Instalacion de Medidor]: entrenado con 10 trámites reales — threshold=0.0601
+2026-06-12 04:34:14,631 [INFO] ai.predictor.anomaly_detector — AnomalyDetector re-entrenado para [Instalacion de Medidor] — 10 muestras normales
