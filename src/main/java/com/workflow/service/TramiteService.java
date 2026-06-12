@@ -93,6 +93,8 @@ public class TramiteService {
             row.put("status", t.getStatus() != null ? t.getStatus().name() : "");
             row.put("userName", userNameMap.getOrDefault(t.getRequestedById(), ""));
             row.put("createdAt", t.getCreatedAt() != null ? t.getCreatedAt().toString() : "");
+            boolean done = t.getStatus() == Tramite.Status.COMPLETADO || t.getStatus() == Tramite.Status.RECHAZADO;
+            row.put("completedAt", done && t.getUpdatedAt() != null ? t.getUpdatedAt().toString() : null);
             return row;
         }).toList();
     }

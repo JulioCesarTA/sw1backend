@@ -102,6 +102,54 @@ public class WorkflowAiProxyService {
         return postTo(tfBaseUrl, "/nlp/fill-form", body);
     }
 
+    public Map<String, Object> predictDelay(String workflowId) {
+        return getFrom(tfBaseUrl, "/nlp/predict-delay/" + workflowId);
+    }
+
+    public Map<String, Object> predictBottleneck(String workflowId) {
+        return getFrom(tfBaseUrl, "/nlp/predict-bottleneck/" + workflowId);
+    }
+
+    public Map<String, Object> getOfflineData() {
+        return getFrom(tfBaseUrl, "/models/offline-data");
+    }
+
+    public org.springframework.http.ResponseEntity<byte[]> getStaticModelFile(String path) {
+        try {
+            HttpResponse<byte[]> response = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build()
+                    .send(
+                        HttpRequest.newBuilder()
+                                .uri(URI.create(tfBaseUrl + "/static/" + path))
+                                .timeout(Duration.ofSeconds(30))
+                                .header("Accept", "application/json")
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofByteArray()
+                    );
+            if (response.statusCode() == 404) {
+                return org.springframework.http.ResponseEntity.notFound().build();
+            }
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new ResponseStatusException(resolveStatus(response.statusCode()), "Error obteniendo modelo");
+            }
+            return org.springframework.http.ResponseEntity.ok()
+                    .header("Content-Type", "application/json")
+                    .header("Cache-Control", "public, max-age=86400")
+                    .body(response.body());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error conectando al servicio TF: " + e.getMessage());
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error conectando al servicio TF: " + e.getMessage());
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error proxy TF: " + e.getMessage());
+        }
+    }
+
     public Map<String, Object> rankPriorityWorkflow(String workflowId) {
         return postTo(tfBaseUrl, "/nlp/rank-priority-real/" + workflowId, Map.of());
     }
@@ -228,6 +276,33 @@ public class WorkflowAiProxyService {
 
     private Map<String, Object> post(String path, Map<String, Object> body) {
         return postTo(aiBaseUrl, path, body);
+    }
+
+    private Map<String, Object> getFrom(String baseUrl, String path) {
+        try {
+            HttpResponse<String> response = httpClient.send(
+                    HttpRequest.newBuilder()
+                            .uri(URI.create(baseUrl + path))
+                            .timeout(Duration.ofSeconds(120))
+                            .header("Accept", "application/json")
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new ResponseStatusException(resolveStatus(response.statusCode()), response.body());
+            }
+            return objectMapper.readValue(response.body(), new TypeReference<>() {});
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo conectar con el servicio de IA: " + e.getMessage());
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo conectar con el servicio de IA: " + e.getMessage());
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error proxy del servicio de IA: " + e.getMessage());
+        }
     }
 
     private Map<String, Object> postTo(String baseUrl, String path, Map<String, Object> body) {

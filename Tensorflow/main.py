@@ -153,13 +153,22 @@ async def report_generate(req: ReportGenerateRequest):
         workflows=context["workflows"],
         users=context["users"],
     )
-    spec = parser.parse(req.prompt)
-    rows = data_svc.filter_rows(all_rows, spec)
+    spec   = parser.parse(req.prompt)
+    intent = spec.get("intent", "tramite_list")
 
-    fmt     = spec.get("format", "screen")
-    columns = spec.get("columns", ["code", "title", "workflowName", "departmentName",
-                                   "status", "userName", "createdAt"])
-    title   = spec.get("title", "Reporte de Trámites")
+    if intent == "department_flow":
+        rows    = data_svc.aggregate_department_flow(all_rows, spec)
+        columns = spec.get("columns", ["departmentName", "total"])
+    elif intent == "avg_time":
+        rows    = data_svc.aggregate_avg_time(all_rows, spec)
+        columns = spec.get("columns", ["departmentName", "workflowName", "avgMinutes", "count"])
+    else:
+        rows    = data_svc.filter_rows(all_rows, spec)
+        columns = spec.get("columns", ["code", "title", "workflowName", "departmentName",
+                                       "status", "userName", "createdAt"])
+
+    fmt   = spec.get("format", "screen")
+    title = spec.get("title", "Reporte de Trámites")
 
     if fmt in ("word", "excel"):
         group_by = spec.get("groupBy")

@@ -10,6 +10,7 @@ import com.workflow.model.WorkflowTransition;
 import com.workflow.repository.CompanyRepository;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.FormDefinitionRepository;
+import com.workflow.repository.TramiteRepository;
 import com.workflow.repository.WorkflowRepository;
 import com.workflow.repository.WorkflowNodoRepository;
 import com.workflow.repository.WorkflowTransitionRepository;
@@ -37,6 +38,7 @@ public class WorkflowService {
     private final FormDefinitionRepository formRepo;
     private final CompanyRepository companyRepo;
     private final DepartmentRepository departmentRepo;
+    private final TramiteRepository tramiteRepo;
     private final FileStorageService fileStorageService;
     private final WorkflowAiProxyService workflowAiProxyService;
 
@@ -60,6 +62,8 @@ public class WorkflowService {
                 .collect(Collectors.toMap(Company::getId, Company::getName));
         Map<String, List<WorkflowNodo>> nodoByWf = nodoRepo.findByWorkflowIdIn(wfIds).stream()
                 .collect(Collectors.groupingBy(WorkflowNodo::getWorkflowId));
+        Map<String, Long> tramiteCountByWf = wfIds.stream()
+                .collect(Collectors.toMap(id -> id, id -> tramiteRepo.countByWorkflowId(id)));
         return workflows.stream().map(wf -> {
             List<WorkflowNodo> nodo = nodoByWf.getOrDefault(wf.getId(), List.of());
             Map<String, Object> map = new LinkedHashMap<>();
@@ -69,7 +73,7 @@ public class WorkflowService {
             map.put("companyId", wf.getCompanyId());
             map.put("companyName", wf.getCompanyId() != null ? companyNames.get(wf.getCompanyId()) : null);
             map.put("nodo", nodo);
-            map.put("_count", Map.of("tramites", 0, "nodo", nodo.size()));
+            map.put("_count", Map.of("tramites", tramiteCountByWf.getOrDefault(wf.getId(), 0L), "nodo", nodo.size()));
             return map;
         }).toList();
     }
@@ -473,7 +477,7 @@ public class WorkflowService {
         map.put("companyName", company != null ? company.getName() : null);
         map.put("nodo", nodoMapped);
         map.put("transitions", transitions);
-        map.put("_count", Map.of("tramites", 0, "nodo", nodos.size()));
+        map.put("_count", Map.of("tramites", tramiteRepo.countByWorkflowId(workflow.getId()), "nodo", nodos.size()));
         return map;
     }
 

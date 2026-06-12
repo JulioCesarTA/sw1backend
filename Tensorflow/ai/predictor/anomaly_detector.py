@@ -239,18 +239,22 @@ class AnomalyDetector:
             main_factor = self.FEATURE_NAMES[top_idx]
             score       = round(min(error / max(threshold * 2, 1e-8), 1.0), 3)
 
+            cur_nodo_id2  = t.get("currentNodoId")
+            cur_nodo_name = (self._nodo_map.get(cur_nodo_id2, {}).get("name", "")
+                             if cur_nodo_id2 else "")
             entry = {
-                "id":           str(t["_id"]),
-                "code":         t.get("code", ""),
-                "title":        t.get("title", ""),
-                "workflowName": self._wf_map.get(t.get("workflowId", ""), {}).get("name", ""),
-                "status":       t.get("status", ""),
-                "elapsedHours": round(elapsed_h, 1),
-                "expectedHours": round(exp_h, 1),
-                "anomalyScore": score,
-                "isAnomaly":    is_anomaly,
-                "mainFactor":   main_factor,
-                "factorDetail": self._factor_detail(main_factor, elapsed_h, exp_h, time_in_nodo_min, avg_nodo_min, nodo_pos),
+                "id":              str(t["_id"]),
+                "code":            t.get("code", ""),
+                "title":           t.get("title", ""),
+                "workflowName":    self._wf_map.get(t.get("workflowId", ""), {}).get("name", ""),
+                "currentNodoName": cur_nodo_name,
+                "status":          t.get("status", ""),
+                "elapsedHours":    round(elapsed_h, 1),
+                "expectedHours":   round(exp_h, 1),
+                "anomalyScore":    score,
+                "isAnomaly":       is_anomaly,
+                "mainFactor":      main_factor,
+                "factorDetail":    self._factor_detail(main_factor, elapsed_h, exp_h, time_in_nodo_min, avg_nodo_min, nodo_pos),
             }
             (anomalies if is_anomaly else normal).append(entry)
 

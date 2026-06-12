@@ -8,4 +8,6 @@ import java.util.List;
 public interface TramiteRepository extends MongoRepository<Tramite, String> {
     List<Tramite> findByAssignedUserIdOrRequestedById(String assignedUserId, String requestedById);
     List<Tramite> findByParentTramiteId(String parentTramiteId);
+    long countByWorkflowId(String workflowId);
+    long countByWorkflowIdIn(java.util.Collection<String> workflowIds);
 }

@@ -73,6 +73,16 @@ public class WorkflowAiController {
         return ResponseEntity.ok(workflowAiProxyService.workflowRouter(prompt, user != null ? user.getCompanyId() : null, files));
     }
 
+    @GetMapping("/nlp/predict-delay/{workflowId}")
+    public ResponseEntity<Map<String, Object>> predictDelay(@PathVariable String workflowId) {
+        return ResponseEntity.ok(workflowAiProxyService.predictDelay(workflowId));
+    }
+
+    @GetMapping("/nlp/predict-bottleneck/{workflowId}")
+    public ResponseEntity<Map<String, Object>> predictBottleneck(@PathVariable String workflowId) {
+        return ResponseEntity.ok(workflowAiProxyService.predictBottleneck(workflowId));
+    }
+
     @PostMapping("/nlp/rank-priority-real/{workflowId}")
     public ResponseEntity<Map<String, Object>> rankPriorityWorkflow(@PathVariable String workflowId) {
         return ResponseEntity.ok(workflowAiProxyService.rankPriorityWorkflow(workflowId));
@@ -81,5 +91,20 @@ public class WorkflowAiController {
     @PostMapping("/nlp/detect-anomalies/{workflowId}")
     public ResponseEntity<Map<String, Object>> detectAnomaliesWorkflow(@PathVariable String workflowId) {
         return ResponseEntity.ok(workflowAiProxyService.detectAnomaliesWorkflow(workflowId));
+    }
+
+    @GetMapping("/models/offline-data")
+    public ResponseEntity<Map<String, Object>> offlineData() {
+        return ResponseEntity.ok(workflowAiProxyService.getOfflineData());
+    }
+
+    @GetMapping("/static/models/{modelName}/model.json")
+    public ResponseEntity<byte[]> staticModel(@PathVariable String modelName) {
+        return workflowAiProxyService.getStaticModelFile("models/" + modelName + "/model.json");
+    }
+
+    @GetMapping("/static/models/anomaly/{workflowId}/model.json")
+    public ResponseEntity<byte[]> staticAnomalyModel(@PathVariable String workflowId) {
+        return workflowAiProxyService.getStaticModelFile("models/anomaly/" + workflowId + "/model.json");
     }
 }

@@ -5,6 +5,7 @@ import com.workflow.service.WorkflowAiProxyService;
 import com.workflow.repository.CompanyRepository;
 import com.workflow.repository.DepartmentRepository;
 import com.workflow.repository.FormDefinitionRepository;
+import com.workflow.repository.TramiteRepository;
 import com.workflow.repository.WorkflowNodoRepository;
 import com.workflow.repository.WorkflowRepository;
 import com.workflow.repository.WorkflowTransitionRepository;
@@ -32,6 +33,7 @@ class WorkflowServiceForwardConfigTest {
                 mock(FormDefinitionRepository.class),
                 mock(CompanyRepository.class),
                 mock(DepartmentRepository.class),
+                mock(TramiteRepository.class),
                 mock(FileStorageService.class),
                 mock(WorkflowAiProxyService.class)
         );
