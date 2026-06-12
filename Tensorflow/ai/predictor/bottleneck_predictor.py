@@ -3,13 +3,13 @@ import numpy as np
 from datetime import datetime
 from core.api_client import get_mongo_db, load_workflows
 from ai.predictor.time_utils import naive_dt as _naive_dt
+from ai.model_exporter import export_weights
 
 logger = logging.getLogger(__name__)
 
 class BottleneckPredictor:
     """
     Dense neural network per-node: predicts probability each node will be a bottleneck.
-
     Features (4):
       avg_minutes_norm, position_in_workflow, historical_overtime_ratio, visit_norm
     Label:
@@ -89,6 +89,19 @@ class BottleneckPredictor:
         model.compile(optimizer="adam", loss="binary_crossentropy")
         model.fit(X_np, y_np, epochs=30, batch_size=16, verbose=0)
         logger.info(f"BottleneckPredictor trained on {len(X_np)} samples")
+        try:
+            export_weights(model, "bottleneck_predictor", {
+                "architecture": [
+                    {"units": 24, "activation": "relu", "inputShape": [4]},
+                    {"dropout": 0.2},
+                    {"units": 12, "activation": "relu"},
+                    {"units": 1, "activation": "sigmoid"},
+                ],
+                "node_overtime": {k: round(v, 4) for k, v in node_overtime.items()},
+                "node_visits": node_visits,
+            })
+        except Exception as e:
+            logger.warning(f"BottleneckPredictor export failed: {e}")
         return model, node_overtime, node_visits
 
     # ── inference ─────────────────────────────────────────────────────────

@@ -115,6 +115,28 @@ class FormFiller:
         logger.info("Entrenando FormFiller TF …")
         self.model.fit(X, labels, epochs=100, verbose=0, batch_size=8)
         logger.info("FormFiller listo.")
+        self._export_for_browser()
+
+    def _export_for_browser(self) -> None:
+        try:
+            import json
+            from ai.model_exporter import export_weights
+            vocab = self.vec.get_vocabulary()
+            export_weights(self.model, "form_filler", {
+                "vocabulary": list(vocab),
+                "seqLen": 20,
+                "cmdTypes": CMD_TYPES,
+                "architecture": [
+                    {"type": "embedding", "vocabSize": len(vocab) + 1, "embedDim": 16, "inputLen": 20},
+                    {"type": "globalAvgPool"},
+                    {"units": 32, "activation": "relu"},
+                    {"units": len(CMD_TYPES), "activation": "softmax"},
+                ],
+                "trainTexts": [_norm(t) for t in TRAIN_TEXTS],
+                "trainLabels": TRAIN_LABELS,
+            })
+        except Exception as e:
+            logger.warning(f"FormFiller export failed: {e}")
 
     def _classify(self, segment: str) -> str:
         vec   = self.vec(np.array([_norm(segment)])).numpy()

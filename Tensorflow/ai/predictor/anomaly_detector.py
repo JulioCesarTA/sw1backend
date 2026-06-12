@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime
 from core.api_client import get_mongo_db, load_workflows
 from ai.predictor.time_utils import naive_dt as _naive_dt
+from ai.model_exporter import export_weights
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,18 @@ class AnomalyDetector:
         threshold = float(np.percentile(errors, 95))
 
         logger.info(f"  AnomalyDetector [{wf['name']}]: entrenado con {len(samples)} trámites reales — threshold={threshold:.4f}")
+        try:
+            export_weights(model, f"anomaly/{wid}", {
+                "threshold": threshold,
+                "architecture": [
+                    {"units": 8, "activation": "relu", "inputShape": [4]},
+                    {"units": 3, "activation": "relu"},
+                    {"units": 8, "activation": "relu"},
+                    {"units": 4, "activation": "sigmoid"},
+                ],
+            })
+        except Exception as e:
+            logger.warning(f"AnomalyDetector export [{wf['name']}] failed: {e}")
         return (model, threshold)
 
     # ── Inferencia ───────────────────────────────────────────────────────────

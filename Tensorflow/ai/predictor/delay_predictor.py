@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime
 from core.api_client import get_mongo_db, load_workflows
 from ai.predictor.time_utils import naive_dt as _naive_dt
+from ai.model_exporter import export_weights
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,18 @@ class DelayPredictor:
         model.compile(optimizer="adam", loss="binary_crossentropy")
         model.fit(X_np, y_np, epochs=40, batch_size=16, verbose=0)
         logger.info(f"DelayPredictor entrenado con {len(X)} trámites reales")
+        try:
+            export_weights(model, "delay_predictor", {
+                "architecture": [
+                    {"units": 16, "activation": "relu", "inputShape": [3]},
+                    {"dropout": 0.2},
+                    {"units": 8, "activation": "relu"},
+                    {"units": 1, "activation": "sigmoid"},
+                ],
+                "delay_rates": {wid: round(v, 4) for wid, v in delay_rate.items()},
+            })
+        except Exception as e:
+            logger.warning(f"DelayPredictor export failed: {e}")
         return model, delay_rate
 
     # ── Inferencia ───────────────────────────────────────────────────────────

@@ -25,7 +25,9 @@ load_dotenv()
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from pathlib import Path
 
 from reports.data_service              import DataService
 from reports.report_service            import generate_word, generate_excel
@@ -104,6 +106,12 @@ async def lifespan(app: FastAPI):
         anomaly_detector = None
 
     logger.info("✓ Servicio listo en http://localhost:8001")
+
+    # Serve exported model files
+    static_dir = Path(__file__).resolve().parent / "static"
+    static_dir.mkdir(exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
     yield
     logger.info("Cerrando servicio …")
 
@@ -372,6 +380,75 @@ async def reload_workflows():
 
 # -----------------------------------------------------------------------
 # Health
+# -----------------------------------------------------------------------
+# GET /models/offline-data  — everything the browser needs for offline TF inference
+# -----------------------------------------------------------------------
+@app.get("/models/offline-data")
+async def offline_data():
+    from core.api_client import load_workflows, get_mongo_db
+    from datetime import datetime
+
+    wf_map, nodo_map = load_workflows()
+
+    # Active tramites needed for anomaly/priority inference
+    try:
+        db = get_mongo_db()
+        tramites_act = list(db["tramites"].find(
+            {"status": {"$in": ["PENDIENTE", "EN_PROGRESO"]}},
+            {"_id": 1, "code": 1, "title": 1, "workflowId": 1,
+             "currentNodoId": 1, "createdAt": 1, "status": 1},
+            limit=500,
+        ))
+        # Convert ObjectId and datetime to str
+        for t in tramites_act:
+            t["_id"] = str(t["_id"])
+            if isinstance(t.get("createdAt"), datetime):
+                t["createdAt"] = t["createdAt"].isoformat()
+
+        # Recent historial for anomaly features
+        tramite_ids = [t["_id"] for t in tramites_act]
+        historial = list(db["historial_tramites"].find(
+            {"tramiteId": {"$in": tramite_ids}},
+            {"_id": 0, "tramiteId": 1, "changedAt": 1, "toNodoId": 1},
+        ))
+        for h in historial:
+            if isinstance(h.get("changedAt"), datetime):
+                h["changedAt"] = h["changedAt"].isoformat()
+    except Exception as e:
+        logger.warning(f"offline_data: db error — {e}")
+        tramites_act = []
+        historial = []
+
+    # Anomaly thresholds
+    anomaly_thresholds = {}
+    if anomaly_detector:
+        for wid, (_, threshold) in anomaly_detector._models.items():
+            anomaly_thresholds[wid] = threshold
+
+    # Delay rates
+    delay_rates = {}
+    if delay_predictor:
+        delay_rates = {k: round(v, 4) for k, v in delay_predictor._wf_delay_rate.items()}
+
+    # Bottleneck stats
+    node_overtime = {}
+    node_visits = {}
+    if bottleneck_pred:
+        node_overtime = {k: round(v, 4) for k, v in bottleneck_pred._node_overtime.items()}
+        node_visits = bottleneck_pred._node_visits
+
+    return {
+        "wf_map": wf_map,
+        "nodo_map": nodo_map,
+        "tramites_activos": tramites_act,
+        "historial": historial,
+        "anomaly_thresholds": anomaly_thresholds,
+        "delay_rates": delay_rates,
+        "node_overtime": node_overtime,
+        "node_visits": node_visits,
+    }
+
+
 # -----------------------------------------------------------------------
 @app.get("/health")
 async def health():

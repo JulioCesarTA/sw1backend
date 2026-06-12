@@ -3,6 +3,7 @@ import logging
 import os
 from difflib import SequenceMatcher
 import numpy as np
+from ai.model_exporter import STATIC_MODELS_DIR
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
@@ -147,6 +148,7 @@ class WorkflowMatcher:
 
         self.wf_embeddings = [self._encode(self._wf_text(w)) for w in self.workflows]
         logger.info(f"WorkflowMatcher encoder {'entrenado' if len(self.workflows) >= 2 else 'sin entrenar (1 workflow)'}")
+        self._export_for_browser()
 
     def _augment_wf_texts(self, idx: int, full_text: str) -> list[str]:
         """Genera variaciones del texto de un workflow para aumentar datos de entrenamiento."""
@@ -273,3 +275,34 @@ class WorkflowMatcher:
         if score >= 0.70: return "Alta"
         if score >= 0.40: return "Media"
         return "Baja"
+
+    def _export_for_browser(self) -> None:
+        try:
+            out = STATIC_MODELS_DIR / "workflow_matcher"
+            out.mkdir(parents=True, exist_ok=True)
+
+            vocab = self.vectorizer.get_vocabulary() if self.vectorizer else []
+            embeddings = [e.tolist() for e in self.wf_embeddings]
+            workflows_data = []
+            for i, w in enumerate(self.workflows):
+                req = self.field_requirements.get(w["id"], {})
+                workflows_data.append({
+                    "id": w["id"],
+                    "name": w["name"],
+                    "description": w.get("description", ""),
+                    "embedding": embeddings[i] if i < len(embeddings) else [],
+                    "required": req.get("required", []),
+                    "optional": req.get("optional", []),
+                    "text": self._wf_text(w),
+                })
+
+            payload = {
+                "vocabulary": list(vocab),
+                "seqLen": 30,
+                "workflows": workflows_data,
+            }
+            with open(out / "model.json", "w", encoding="utf-8") as f:
+                json.dump(payload, f, separators=(",", ":"))
+            logger.info(f"[export] workflow_matcher → {out}/model.json")
+        except Exception as e:
+            logger.warning(f"WorkflowMatcher export failed: {e}")
